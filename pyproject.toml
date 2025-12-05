@@ -1,0 +1,7 @@
+[project]
+name = "opentools"
+version = "0.1.0"
+description = "Creating an open registry of pre-made tools for agents to work with"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
