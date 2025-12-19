@@ -1,7 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "opentools"
 version = "0.1.0"
-description = "Creating an open registry of pre-made tools for agents to work with"
+description = "an opentool registry"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "httpx>=0.28.1",
+  "pydantic>=2.12.5",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["opentools*"]

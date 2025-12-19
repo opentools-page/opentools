@@ -1,6 +1,12 @@
-def main():
-    print("Hello from opentools!")
+import asyncio
+
+from opentools.finance import alpaca
 
 
-if __name__ == "__main__":
-    main()
+async def main():
+    svc = alpaca(key_id="...", secret_key="...", paper=True)
+    print(await svc.get_account())
+    print(await svc.list_positions())
+
+
+asyncio.run(main())
