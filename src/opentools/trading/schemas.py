@@ -43,3 +43,46 @@ class Clock(TradingModel):
     next_open: datetime | None = None
     next_close: datetime | None = None
     provider_fields: Dict[str, Any] = Field(default_factory=dict)
+
+
+class Asset(TradingModel):
+    provider: str | None = None
+    id: str | None = None
+    symbol: str
+    name: str | None = None
+    exchange: str | None = None
+    asset_class: str | None = None
+    status: str | None = None
+    tradable: bool | None = None
+    marginable: bool | None = None
+    shortable: bool | None = None
+    easy_to_borrow: bool | None = None
+    fractionable: bool | None = None
+    provider_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class Order(TradingModel):
+    provider: str | None = None
+
+    id: str | None = None
+    client_order_id: str | None = None
+    symbol: str | None = None
+    side: Literal["buy", "sell"] | None = None
+    type: str | None = None
+    time_in_force: str | None = None
+    status: str | None = None
+
+    qty: str | None = None
+    notional: str | None = None
+    filled_qty: str | None = None
+    filled_avg_price: str | None = None
+
+    limit_price: str | None = None
+    stop_price: str | None = None
+
+    submitted_at: datetime | None = None
+    filled_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    provider_fields: dict[str, Any] = Field(default_factory=dict)

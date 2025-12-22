@@ -16,7 +16,6 @@ async def main() -> None:
     svc = trading.alpaca(
         key_id=os.environ["ALPACA_KEY"],
         secret_key=os.environ["ALPACA_SECRET"],
-        paper=True,
         model="anthropic",
     )
 
@@ -25,9 +24,10 @@ async def main() -> None:
         model="claude-3-5-haiku-20241022",
         service=svc,
         user_prompt=(
-            "You MUST call clock related function before summarizing. "
-            "Then give me a human-friendly summary."
+            "just using get ordes can you give me first 3 orders please or less if there are not even 3 orders right"
         ),
+        max_rounds=3,
+        max_tokens=400,
     )
 
     print(answer)

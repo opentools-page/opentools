@@ -27,12 +27,157 @@ def alpaca_tools(service) -> list[ToolSpec]:
         ),
         ToolSpec(
             name="get_clock",
-            description="Get Alpaca trading clock (open/closed and next open/close).",
+            description="Get the Alpaca trading clock (market open/close info).",
             input_schema={
                 "type": "object",
                 "properties": {},
                 "additionalProperties": False,
             },
             handler=tool_handler(service.get_clock),
+        ),
+        ToolSpec(
+            name="list_assets",
+            description=(
+                "List Alpaca assets (stocks, etc.) with optional filters. "
+                "Use `limit` to cap how many assets are returned."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Asset status filter (e.g. 'active').",
+                    },
+                    "asset_class": {
+                        "type": "string",
+                        "description": "Asset class filter (e.g. 'us_equity').",
+                    },
+                    "exchange": {
+                        "type": "string",
+                        "description": "Exchange code (e.g. 'NYSE', 'NASDAQ').",
+                    },
+                    "attributes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional asset attributes.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200,
+                        "default": 20,
+                        "description": (
+                            "Maximum number of assets to return. "
+                            "Defaults to 20 to avoid huge tool outputs."
+                        ),
+                    },
+                },
+                "additionalProperties": False,
+            },
+            handler=tool_handler(service.list_assets),
+        ),
+        ToolSpec(
+            name="get_asset",
+            description="Get a single Alpaca asset by symbol or asset ID.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "symbol_or_asset_id": {
+                        "type": "string",
+                        "description": "Ticker symbol or Alpaca asset ID.",
+                    }
+                },
+                "required": ["symbol_or_asset_id"],
+                "additionalProperties": False,
+            },
+            handler=tool_handler(service.get_asset),
+        ),
+        ToolSpec(
+            name="list_orders",
+            description=(
+                "List Alpaca orders with optional filters. "
+                "Use `limit` to cap how many orders are returned."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Order status: 'open', 'closed', or 'all'.",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200,
+                        "default": 20,
+                        "description": (
+                            "Maximum number of orders to return. "
+                            "Defaults to 20 to avoid huge tool outputs."
+                        ),
+                    },
+                    "after": {
+                        "type": "string",
+                        "description": "Only orders submitted after this ISO8601 timestamp.",
+                    },
+                    "until": {
+                        "type": "string",
+                        "description": "Only orders submitted until this ISO8601 timestamp.",
+                    },
+                    "direction": {
+                        "type": "string",
+                        "description": "Sort direction: 'asc' or 'desc'.",
+                    },
+                    "nested": {
+                        "type": "boolean",
+                        "description": "If true, roll up multi-leg orders under 'legs'.",
+                    },
+                    "symbols": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by symbols, e.g. ['AAPL', 'TSLA'].",
+                    },
+                    "side": {
+                        "type": "string",
+                        "description": "Filter by side: 'buy' or 'sell'.",
+                    },
+                    "asset_class": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Filter by asset classes, e.g. ['us_equity', 'us_option']."
+                        ),
+                    },
+                    "before_order_id": {
+                        "type": "string",
+                        "description": "Only orders submitted before this order id.",
+                    },
+                    "after_order_id": {
+                        "type": "string",
+                        "description": "Only orders submitted after this order id.",
+                    },
+                },
+                "additionalProperties": False,
+            },
+            handler=tool_handler(service.list_orders),
+        ),
+        ToolSpec(
+            name="get_order",
+            description="Get a single Alpaca order by order ID.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "order_id": {
+                        "type": "string",
+                        "description": "Alpaca order ID.",
+                    },
+                    "nested": {
+                        "type": "boolean",
+                        "description": "If true, include legs for multi-leg orders.",
+                    },
+                },
+                "required": ["order_id"],
+                "additionalProperties": False,
+            },
+            handler=tool_handler(service.get_order),
         ),
     ]
