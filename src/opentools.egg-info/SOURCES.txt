@@ -15,7 +15,14 @@ src/opentools/finance/__init__.py
 src/opentools/finance/schemas.py
 src/opentools/finance/service.py
 src/opentools/finance/tools.py
+src/opentools/finance/providers/__init__.py
 src/opentools/finance/providers/alpaca/__init__.py
 src/opentools/finance/providers/alpaca/_endpoints.py
 src/opentools/finance/providers/alpaca/client.py
 src/opentools/finance/providers/alpaca/errors.py
+src/opentools/finance/providers/alpaca/mappers.py
+src/opentools/finance/providers/alpaca/tools.py
+src/opentools/finance/providers/alpaca/transport.py
+src/opentools/finance/providers/alpaca/clients/__init__.py
+src/opentools/finance/providers/alpaca/clients/account.py
+src/opentools/finance/providers/alpaca/clients/position.py

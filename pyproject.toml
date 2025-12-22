@@ -9,8 +9,10 @@ description = "an opentool registry"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+  "anthropic>=0.75.0",
   "httpx>=0.28.1",
   "pydantic>=2.12.5",
+  "python-dotenv>=1.2.1",
 ]
 
 [tool.setuptools]
