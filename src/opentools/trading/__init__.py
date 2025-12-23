@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, Literal, Mapping
+from typing import Any, Iterable, Mapping
 
 from opentools.auth.impl import AlpacaAuth, HeaderAuth
 from opentools.core.errors import AuthError
@@ -14,9 +14,57 @@ from opentools.trading.providers.alpaca.mappers import (
     position_from_alpaca,
 )
 from opentools.trading.providers.alpaca.transport import AlpacaTransport
-from opentools.trading.service import TradingService
+from opentools.trading.service import ModelName, TradingService
 
-ModelName = Literal["anthropic", "openai"]
+
+def _resolve_alpaca_auth(
+    *,
+    auth: Any | None,
+    key_id: str | None,
+    secret_key: str | None,
+) -> Any:
+    if key_id and secret_key:
+        return AlpacaAuth(key_id=key_id, secret_key=secret_key)
+
+    if isinstance(auth, Mapping):
+        if "key_id" in auth and "secret_key" in auth:
+            return AlpacaAuth(
+                key_id=str(auth["key_id"]),
+                secret_key=str(auth["secret_key"]),
+            )
+
+        if "APCA-API-KEY-ID" in auth and "APCA-API-SECRET-KEY" in auth:
+            return HeaderAuth(headers_dict=dict(auth))
+
+        raise AuthError(
+            message=(
+                "Invalid Alpaca auth mapping. Expected either "
+                "{key_id, secret_key} or raw APCA-* headers."
+            ),
+            domain="trading",
+            provider="alpaca",
+            details=dict(auth),
+        )
+
+    if auth is not None:
+        if isinstance(auth, (AlpacaAuth, HeaderAuth)):
+            return auth
+
+        raise AuthError(
+            message=(
+                "Invalid Alpaca auth object. Expected AlpacaAuth, HeaderAuth "
+                "or a valid mapping / key_id+secret_key."
+            ),
+            domain="trading",
+            provider="alpaca",
+            details=repr(auth),
+        )
+
+    raise AuthError(
+        message="Missing Alpaca auth. Provide key_id+secret_key or an auth mapping.",
+        domain="trading",
+        provider="alpaca",
+    )
 
 
 def alpaca(
@@ -26,40 +74,23 @@ def alpaca(
     secret_key: str | None = None,
     paper: bool = True,
     timeout: float = 30.0,
-    model: ModelName = "anthropic",
+    model: ModelName,
     include: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
 ) -> TradingService:
+    """
+    Create a TradingService bound to Alpaca.
+
+    The `model` parameter selects which LLM adapter bundle to produce
+    ("anthropic", "openai", or "gemini" or "ollama). No default is chosen.
+    """
     base_url = PAPER_BASE_URL if paper else LIVE_BASE_URL
 
-    if key_id and secret_key:
-        alpaca_auth = AlpacaAuth(key_id=key_id, secret_key=secret_key)
-    elif isinstance(auth, Mapping):
-        if "key_id" in auth and "secret_key" in auth:
-            alpaca_auth = AlpacaAuth(
-                key_id=str(auth["key_id"]),
-                secret_key=str(auth["secret_key"]),
-            )
-        elif "APCA-API-KEY-ID" in auth and "APCA-API-SECRET-KEY" in auth:
-            alpaca_auth = HeaderAuth(headers_dict=auth)
-        else:
-            raise AuthError(
-                message=(
-                    "Invalid Alpaca auth mapping. Use {key_id, secret_key} "
-                    "or raw APCA-* headers."
-                ),
-                domain="trading",
-                provider="alpaca",
-                details=dict(auth),
-            )
-    elif auth is not None:
-        alpaca_auth = auth
-    else:
-        raise AuthError(
-            message="Missing Alpaca auth. Provide key_id+secret_key or auth mapping.",
-            domain="trading",
-            provider="alpaca",
-        )
+    alpaca_auth = _resolve_alpaca_auth(
+        auth=auth,
+        key_id=key_id,
+        secret_key=secret_key,
+    )
 
     transport = AlpacaTransport(
         auth=alpaca_auth,

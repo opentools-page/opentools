@@ -7,7 +7,7 @@ from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
 
 from .schemas import Account, Asset, Clock, Order, Position
 
-ModelName = Literal["anthropic", "openai"]
+ModelName = Literal["anthropic", "openai", "gemini", "ollama", "openrouter"]
 
 
 class TradingProviderClient(Protocol):
@@ -256,14 +256,29 @@ class TradingService(Iterable[Any]):
         )
 
         if resolved == "anthropic":
-            from opentools.adapters.anthropic.bundle import to_anthropic_bundle
+            from opentools.adapters.models.anthropic.bundle import to_anthropic_bundle
 
             bundle = to_anthropic_bundle(list(specs))
         elif resolved == "openai":
-            from opentools.adapters.openai import to_openai_bundle
+            from opentools.adapters.models.openai.bundle import to_openai_bundle
 
             bundle = to_openai_bundle(specs)
+        elif resolved == "gemini":
+            from opentools.adapters.models.gemini.bundle import to_gemini_bundle
+
+            bundle = to_gemini_bundle(specs)
+        elif resolved == "ollama":
+            from opentools.adapters.models.ollama.bundle import to_ollama_bundle
+
+            bundle = to_ollama_bundle(specs)
+        elif resolved == "openrouter":
+            from opentools.adapters.models.openrouter.bundle import (
+                to_openrouter_bundle,
+            )
+
+            bundle = to_openrouter_bundle(specs)
         else:
+            # should never be reached -- but in case
             raise ValueError(f"Unknown model: {resolved}")
 
         self._bundle_cache[key] = bundle
