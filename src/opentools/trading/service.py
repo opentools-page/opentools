@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Iterator, Literal, Protocol
+from typing import Any, Callable, Iterable, Iterator, Protocol
 
+from opentools.core.bundles import cached_bundle_for
 from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
+from opentools.core.types import FrameworkName, ModelName
 
 from .schemas import Account, Asset, Clock, Order, Position
-
-ModelName = Literal["anthropic", "openai", "gemini", "ollama", "openrouter"]
 
 
 class TradingProviderClient(Protocol):
@@ -76,7 +76,8 @@ class TradingService(Iterable[Any]):
     clock_mapper: Callable[[dict], Clock]
     model: ModelName
 
-    # optional mappers
+    # optional config / mappers
+    framework: FrameworkName | None = None
     asset_mapper: Callable[[dict], Asset | None] | None = None
     order_mapper: Callable[[dict], Order | None] | None = None
 
@@ -210,8 +211,6 @@ class TradingService(Iterable[Any]):
         raw = await self.client.get_order(order_id, nested=nested)
         return self.order_mapper(raw)
 
-    # ---- tool specs & bundling ----
-
     def tool_specs(
         self,
         *,
@@ -241,48 +240,28 @@ class TradingService(Iterable[Any]):
         exclude: Iterable[str] | None = None,
         model: ModelName | None = None,
     ) -> ToolBundle:
-        resolved: ModelName = model or self.model
+        resolved = model or self.model
 
         effective_include = tuple(sorted(set(include or self.include)))
         effective_exclude = tuple(sorted(set(exclude or self.exclude)))
-
-        key = (resolved, effective_include, effective_exclude)
-        if key in self._bundle_cache:
-            return self._bundle_cache[key]
 
         specs = self.tool_specs(
             include=effective_include,
             exclude=effective_exclude,
         )
 
-        if resolved == "anthropic":
-            from opentools.adapters.models.anthropic.bundle import to_anthropic_bundle
+        return cached_bundle_for(
+            model=resolved,
+            specs=specs,
+            cache=self._bundle_cache,
+            include=effective_include,
+            exclude=effective_exclude,
+        )
 
-            bundle = to_anthropic_bundle(list(specs))
-        elif resolved == "openai":
-            from opentools.adapters.models.openai.bundle import to_openai_bundle
+    def framework_tools(self) -> list[Any]:
+        from opentools.core.frameworks import framework_tools as _fw_tools
 
-            bundle = to_openai_bundle(specs)
-        elif resolved == "gemini":
-            from opentools.adapters.models.gemini.bundle import to_gemini_bundle
-
-            bundle = to_gemini_bundle(specs)
-        elif resolved == "ollama":
-            from opentools.adapters.models.ollama.bundle import to_ollama_bundle
-
-            bundle = to_ollama_bundle(specs)
-        elif resolved == "openrouter":
-            from opentools.adapters.models.openrouter.bundle import (
-                to_openrouter_bundle,
-            )
-
-            bundle = to_openrouter_bundle(specs)
-        else:
-            # should never be reached -- but in case
-            raise ValueError(f"Unknown model: {resolved}")
-
-        self._bundle_cache[key] = bundle
-        return bundle
+        return _fw_tools(self)
 
     @property
     def tools(self) -> list[Any]:
