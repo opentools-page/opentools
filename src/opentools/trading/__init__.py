@@ -4,6 +4,7 @@ from typing import Any, Iterable, Mapping
 
 from opentools.auth.impl import AlpacaAuth, HeaderAuth
 from opentools.core.errors import AuthError
+from opentools.core.types import FrameworkName, ModelName
 from opentools.trading.providers.alpaca._endpoints import LIVE_BASE_URL, PAPER_BASE_URL
 from opentools.trading.providers.alpaca.client import AlpacaClient
 from opentools.trading.providers.alpaca.mappers import (
@@ -14,7 +15,7 @@ from opentools.trading.providers.alpaca.mappers import (
     position_from_alpaca,
 )
 from opentools.trading.providers.alpaca.transport import AlpacaTransport
-from opentools.trading.service import ModelName, TradingService
+from opentools.trading.service import TradingService
 
 
 def _resolve_alpaca_auth(
@@ -75,15 +76,10 @@ def alpaca(
     paper: bool = True,
     timeout: float = 30.0,
     model: ModelName,
+    framework: FrameworkName | None = None,
     include: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
 ) -> TradingService:
-    """
-    Create a TradingService bound to Alpaca.
-
-    The `model` parameter selects which LLM adapter bundle to produce
-    ("anthropic", "openai", or "gemini" or "ollama). No default is chosen.
-    """
     base_url = PAPER_BASE_URL if paper else LIVE_BASE_URL
 
     alpaca_auth = _resolve_alpaca_auth(
@@ -110,6 +106,7 @@ def alpaca(
         asset_mapper=asset_from_alpaca,
         order_mapper=order_from_alpaca,
         model=model,
+        framework=framework,
         include=inc_tools,
         exclude=exc_tools,
     )

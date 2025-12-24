@@ -1,55 +1,46 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Iterable, Protocol
 
+from .tools import ToolInput, ToolSpec
 from .types import FrameworkName
 
 
-class FrameworkAwareService(Protocol):
-    """
-    Minimal interface for something that can be adapted to a framework.
-
-    TradingService already satisfies this:
-      - .framework: FrameworkName | None
-      - .tools: list[Any]
-    """
-
+class FrameworkService(Protocol):
     framework: FrameworkName | None
+
+    def tool_specs(
+        self,
+        *,
+        include: Iterable[str] | None = None,
+        exclude: Iterable[str] | None = None,
+    ) -> list[ToolSpec]: ...
+
+    async def call_tool(self, tool_name: str, tool_input: ToolInput) -> Any: ...
 
     @property
     def tools(self) -> list[Any]: ...
 
 
-def framework_tools(service: FrameworkAwareService) -> list[Any]:
+def framework_tools(service: FrameworkService) -> list[Any]:
     """
-    Return a list of *framework-ready* tools for the given service.
-
-    - If `service.framework is None`:
-        just returns the raw `service.tools`
-    - If `pydantic_ai`:
-        uses adapters.frameworks.pydantic_ai.tools_for_service
-    - If `langgraph`:
-        uses adapters.frameworks.langgraph.tools_for_service
-    - If unknown:
-        raises ValueError
+    Convert a service into framework-ready tools, or fall back
+    to provider-native model-shaped tools.
     """
-
-    fw = service.framework
-
-    if fw is None:
-        # No framework declared → just use raw tool bundle tools
+    # No framework configured → return model-shaped tools
+    if service.framework is None:
         return list(service.tools)
 
-    if fw == "pydantic_ai":
+    if service.framework == "pydantic_ai":
         from opentools.adapters.frameworks.pydantic_ai import tools_for_service
 
-        return list(tools_for_service(service))
+        return tools_for_service(service)
 
-    if fw == "langgraph":
+    if service.framework == "langgraph":
         from opentools.adapters.frameworks.langgraph import (
             tools_for_service as lg_tools_for_service,
         )
 
-        return list(lg_tools_for_service(service))
+        return lg_tools_for_service(service)
 
-    raise ValueError(f"Unknown framework: {fw!r}")
+    raise ValueError(f"Unknown framework: {service.framework!r}")

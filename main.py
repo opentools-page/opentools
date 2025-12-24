@@ -1,40 +1,41 @@
-# main_openrouter.py
 from __future__ import annotations
 
 import asyncio
 import os
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
+from langchain.agents import create_agent as create_react_agent
+from langchain_openai import ChatOpenAI
 
 from opentools import trading
-from opentools.adapters.models.openrouter.chat import run_with_tools
 
 load_dotenv()
 
 
 async def main() -> None:
-    client = AsyncOpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=os.environ["OPENROUTER_API_KEY"],
-    )
-
     svc = trading.alpaca(
         key_id=os.environ["ALPACA_KEY"],
         secret_key=os.environ["ALPACA_SECRET"],
-        model="openrouter",
+        model="openai",
+        framework="langgraph",
     )
 
-    answer = await run_with_tools(
-        client=client,
-        model="openai/gpt-4o-mini",
-        service=svc,
-        user_prompt="List the Alpaca trading tools you have available, just their names.",
-        max_rounds=3,
-        max_tokens=400,
+    llm = ChatOpenAI(model="gpt-4.1-mini")
+
+    agent = create_react_agent(
+        llm,
+        tools=svc,
+        system_prompt=(
+            "You are a trading assistant. "
+            "Use the provided tools to inspect the user's Alpaca account. "
+            "First, list the tools you have, then call one or two that are useful."
+        ),
     )
 
-    print(answer)
+    result = await agent.ainvoke(
+        {"messages": [{"role": "user", "content": "Check my Alpaca account balance."}]}
+    )
+    print(result)
 
 
 if __name__ == "__main__":

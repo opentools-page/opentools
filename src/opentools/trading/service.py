@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable, Iterator, Protocol
+from typing import Any, Callable, Protocol
 
 from opentools.core.bundles import cached_bundle_for
 from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
@@ -54,19 +55,21 @@ class TradingProviderClient(Protocol):
 
 
 @dataclass
-class TradingService(Iterable[Any]):
+class TradingService(Sequence[Any]):
     """
     Neutral trading domain service + tool surface.
 
-    Core:
-      - get_account()                  -> Account
-      - list_positions()               -> list[Position]
-      - get_position(symbol_or_id)     -> Position | None
-      - get_clock()                    -> Clock
-      - list_assets(...)               -> list[Asset]
-      - get_asset(symbol_or_id)        -> Asset | None
-      - list_orders(...)               -> list[Order]
-      - get_order(order_id, ...)       -> Order | None
+    Domain:
+      - get_account, list_positions, get_clock, list_assets, list_orders, ...
+
+    Tools:
+      - tool_specs()        -> list[ToolSpec]
+      - bundle()            -> ToolBundle (model-shaped tools)
+      - tools               -> model-shaped tools (from bundle)
+      - framework_tools()   -> framework-shaped tools (e.g. Pydantic-AI)
+      - iteration / indexing:
+            if framework is set     -> framework-shaped tools
+            else                    -> model-shaped tools
     """
 
     # required
@@ -88,6 +91,8 @@ class TradingService(Iterable[Any]):
     _bundle_cache: dict[
         tuple[ModelName, tuple[str, ...], tuple[str, ...]], ToolBundle
     ] = field(default_factory=dict, init=False, repr=False)
+
+    # ---- provider metadata ----
 
     @property
     def provider(self) -> str:
@@ -211,6 +216,8 @@ class TradingService(Iterable[Any]):
         raw = await self.client.get_order(order_id, nested=nested)
         return self.order_mapper(raw)
 
+    # ---- tool specs & bundling ----
+
     def tool_specs(
         self,
         *,
@@ -259,16 +266,38 @@ class TradingService(Iterable[Any]):
         )
 
     def framework_tools(self) -> list[Any]:
+        """
+        Framework-shaped tools (e.g. Pydantic-AI Tool objects).
+
+        Used by __iter__ / __getitem__ when `framework` is set.
+        """
         from opentools.core.frameworks import framework_tools as _fw_tools
 
         return _fw_tools(self)
 
     @property
     def tools(self) -> list[Any]:
+        """
+        Provider-native, model-shaped tools from the bundle.
+        """
         return self.bundle().tools
 
     async def call_tool(self, tool_name: str, tool_input: ToolInput) -> Any:
         return await self.bundle().call(tool_name, tool_input)
 
+    # ---- Sequence interface for Agent(..., tools=svc) ----
+
+    def _tool_list_for_iteration(self) -> list[Any]:
+        if self.framework is not None:
+            return self.framework_tools()
+        return self.tools
+
+    def __len__(self) -> int:
+        return len(self._tool_list_for_iteration())
+
+    def __getitem__(self, index: int | slice) -> Any:
+        tools = self._tool_list_for_iteration()
+        return tools[index]
+
     def __iter__(self) -> Iterator[Any]:
-        return iter(self.tools)
+        return iter(self._tool_list_for_iteration())

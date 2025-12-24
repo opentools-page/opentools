@@ -7,6 +7,8 @@ src/opentools.egg-info/dependency_links.txt
 src/opentools.egg-info/requires.txt
 src/opentools.egg-info/top_level.txt
 src/opentools/adapters/utils.py
+src/opentools/adapters/frameworks/langgraph/__init__.py
+src/opentools/adapters/frameworks/pydantic_ai/__init__.py
 src/opentools/adapters/models/anthropic/__init__.py
 src/opentools/adapters/models/anthropic/bundle.py
 src/opentools/adapters/models/anthropic/chat.py
@@ -25,10 +27,13 @@ src/opentools/adapters/models/openrouter/chat.py
 src/opentools/auth/__init__.py
 src/opentools/auth/impl.py
 src/opentools/auth/interfaces.py
+src/opentools/core/bundles.py
 src/opentools/core/errors.py
+src/opentools/core/frameworks.py
 src/opentools/core/logging.py
 src/opentools/core/tool_runner.py
 src/opentools/core/tools.py
+src/opentools/core/types.py
 src/opentools/trading/__init__.py
 src/opentools/trading/schemas.py
 src/opentools/trading/service.py
