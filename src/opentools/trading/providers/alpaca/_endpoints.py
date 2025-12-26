@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-PAPER_BASE_URL = "https://paper-api.alpaca.markets"
-LIVE_BASE_URL = "https://api.alpaca.markets"
+ALPACA_PAPER_URL = "https://paper-api.alpaca.markets"
+ALPACA_LIVE_URL = "https://api.alpaca.markets"
 
 ACCOUNT_PATH = "/v2/account"
 

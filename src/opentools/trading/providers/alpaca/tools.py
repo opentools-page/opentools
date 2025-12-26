@@ -180,4 +180,53 @@ def alpaca_tools(service) -> list[ToolSpec]:
             },
             handler=tool_handler(service.get_order),
         ),
+        ToolSpec(
+            name="get_portfolio_history",
+            description=(
+                "Get Alpaca account portfolio history (equity and P&L timeseries). "
+                "Use period/timeframe for range, and intraday_reporting/pnl_reset "
+                "for intraday behaviour."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "description": "Duration like '1D', '1W', '1M', '3M', '1A'.",
+                    },
+                    "timeframe": {
+                        "type": "string",
+                        "description": "Resolution: '1Min', '5Min', '15Min', '1H', '1D'.",
+                    },
+                    "intraday_reporting": {
+                        "type": "string",
+                        "description": (
+                            "Intraday reporting mode: 'market_hours', "
+                            "'extended_hours', or 'continuous'."
+                        ),
+                    },
+                    "start": {
+                        "type": "string",
+                        "description": "Start timestamp (RFC3339).",
+                    },
+                    "end": {
+                        "type": "string",
+                        "description": "End timestamp (RFC3339).",
+                    },
+                    "pnl_reset": {
+                        "type": "string",
+                        "description": "PnL reset mode: 'per_day' or 'no_reset'.",
+                    },
+                    "cashflow_types": {
+                        "type": "string",
+                        "description": (
+                            "Cashflow filter: 'ALL', 'NONE', or comma-separated "
+                            "activity types."
+                        ),
+                    },
+                },
+                "additionalProperties": False,
+            },
+            handler=tool_handler(service.get_portfolio_history),
+        ),
     ]

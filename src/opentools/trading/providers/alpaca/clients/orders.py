@@ -22,9 +22,6 @@ async def list_orders(
     before_order_id: str | None = None,
     after_order_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    GET /v2/orders with full Alpaca-style filters.
-    """
     params: dict[str, str] = {}
 
     if status is not None:

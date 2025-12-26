@@ -6,11 +6,12 @@ from .adapters.models.gemini.chat import run_with_tools as gemini_chat
 from .adapters.models.ollama.chat import run_with_tools as ollama_chat
 from .adapters.models.openai.chat import run_with_tools as openai_chat
 from .adapters.models.openrouter.chat import run_with_tools as openrouter_chat
-from .trading import alpaca
+from .trading import alpaca, coinbase
 
 __all__ = [
     "trading",
     "alpaca",
+    "coinbase",
     "anthropic_chat",
     "openai_chat",
     "gemini_chat",

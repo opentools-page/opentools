@@ -22,7 +22,6 @@ def to_gemini_bundle(tool_specs: List[ToolSpec]) -> ToolBundle:
         fn = genai_types.FunctionDeclaration(
             name=safe,
             description=spec.description,
-            # Your ToolSpec.input_schema is already JSON Schema style
             parameters_json_schema=spec.input_schema,
         )
         function_decls.append(fn)

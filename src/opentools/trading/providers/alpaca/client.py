@@ -13,6 +13,9 @@ from .clients.assets import get_asset as _get_asset
 from .clients.assets import list_assets as _list_assets
 from .clients.orders import get_order as _get_order
 from .clients.orders import list_orders as _list_orders
+from .clients.portfolio import (
+    get_portfolio_history as _get_portfolio_history,
+)
 from .transport import AlpacaTransport
 
 
@@ -93,3 +96,25 @@ class AlpacaClient:
         nested: bool | None = None,
     ) -> dict[str, Any]:
         return await _get_order(self.transport, order_id=order_id, nested=nested)
+
+    async def get_portfolio_history(
+        self,
+        *,
+        period: str | None = None,
+        timeframe: str | None = None,
+        intraday_reporting: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        pnl_reset: str | None = None,
+        cashflow_types: str | None = None,
+    ) -> dict[str, Any]:
+        return await _get_portfolio_history(
+            self.transport,
+            period=period,
+            timeframe=timeframe,
+            intraday_reporting=intraday_reporting,
+            start=start,
+            end=end,
+            pnl_reset=pnl_reset,
+            cashflow_types=cashflow_types,
+        )

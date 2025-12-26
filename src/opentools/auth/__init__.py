@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .impl import BearerTokenAuth, HeaderAuth
-from .interfaces import Auth
+from .interface import Auth
 
 
 def normalize_auth(auth: Any) -> Auth:

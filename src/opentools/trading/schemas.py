@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Literal
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -86,3 +86,21 @@ class Order(TradingModel):
     updated_at: datetime | None = None
 
     provider_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class PortfolioHistoryPoint(TradingModel):
+    timestamp: datetime
+    equity: float
+    profit_loss: float | None = None
+    profit_loss_pct: float | None = None
+
+
+class PortfolioHistory(TradingModel):
+    provider: str | None = None
+    timeframe: str | None = None
+
+    base_value: float | None = None
+    base_value_asof: datetime | None = None
+
+    points: List[PortfolioHistoryPoint] = Field(default_factory=list)
+    provider_fields: Dict[str, Any] = Field(default_factory=dict)

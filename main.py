@@ -13,9 +13,9 @@ load_dotenv()
 
 
 async def main() -> None:
-    svc = trading.alpaca(
-        key_id=os.environ["ALPACA_KEY"],
-        secret_key=os.environ["ALPACA_SECRET"],
+    svc = trading.coinbase(
+        api_key=os.environ["COINBASE_KEY"],
+        api_secret=os.environ["COINBASE_SECRET"],
         model="openai",
         framework="langgraph",
     )
@@ -27,13 +27,13 @@ async def main() -> None:
         tools=svc,
         system_prompt=(
             "You are a trading assistant. "
-            "Use the provided tools to inspect the user's Alpaca account. "
+            "Use the provided tools to inspect the user's Coinbase account. "
             "First, list the tools you have, then call one or two that are useful."
         ),
     )
 
     result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": "Check my Alpaca account balance."}]}
+        {"messages": [{"role": "user", "content": "Break down coinbase information."}]}
     )
     print(result)
 

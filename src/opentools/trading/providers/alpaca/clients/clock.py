@@ -7,7 +7,4 @@ from ..transport import AlpacaTransport
 
 
 async def get_clock(transport: AlpacaTransport) -> dict[str, Any]:
-    """
-    Fetch the Alpaca trading clock.
-    """
     return await transport.get_dict_json(CLOCK_PATH)

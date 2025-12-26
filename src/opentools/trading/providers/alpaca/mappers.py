@@ -1,15 +1,40 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from ...schemas import Account, Asset, Clock, Order, Position
+from ...schemas import (
+    Account,
+    Asset,
+    Clock,
+    Order,
+    PortfolioHistory,
+    PortfolioHistoryPoint,
+    Position,
+)
 
 
 def _parse_dt(s: str | None) -> datetime | None:
     if not s:
         return None
     return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+def _parse_ts(value: Any) -> datetime | None:
+    """
+    Alpaca portfolio history timestamps can be either:
+      - unix seconds (int/float)
+      - RFC3339 strings
+
+    Normalise to aware datetime.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.fromtimestamp(value, tz=timezone.utc)
+    if isinstance(value, str):
+        return _parse_dt(value)
+    return None
 
 
 def account_from_alpaca(data: dict[str, Any]) -> Account:
@@ -103,5 +128,52 @@ def order_from_alpaca(data: dict[str, Any]) -> Order | None:
         filled_at=_parse_dt(data.get("filled_at")),
         created_at=_parse_dt(data.get("created_at")),
         updated_at=_parse_dt(data.get("updated_at")),
+        provider_fields=dict(data),
+    )
+
+
+def portfolio_history_from_alpaca(data: dict[str, Any]) -> PortfolioHistory:
+    timestamps = data.get("timestamp") or []
+    equities = data.get("equity") or []
+    pls = data.get("profit_loss") or []
+    pl_pcts = data.get("profit_loss_pct") or []
+
+    n = min(len(timestamps), len(equities))
+    points: list[PortfolioHistoryPoint] = []
+
+    for i in range(n):
+        ts = _parse_ts(timestamps[i])
+        if ts is None:
+            continue
+
+        equity_raw = equities[i]
+        if equity_raw is None:
+            continue
+
+        pl_val = None
+        if i < len(pls) and pls[i] is not None:
+            pl_val = float(pls[i])
+
+        pl_pct_val = None
+        if i < len(pl_pcts) and pl_pcts[i] is not None:
+            pl_pct_val = float(pl_pcts[i])
+
+        points.append(
+            PortfolioHistoryPoint(
+                timestamp=ts,
+                equity=float(equity_raw),
+                profit_loss=pl_val,
+                profit_loss_pct=pl_pct_val,
+            )
+        )
+
+    return PortfolioHistory(
+        provider="alpaca",
+        timeframe=data.get("timeframe"),
+        base_value=float(data["base_value"])
+        if data.get("base_value") is not None
+        else None,
+        base_value_asof=_parse_ts(data.get("base_value_asof")),
+        points=points,
         provider_fields=dict(data),
     )

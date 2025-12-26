@@ -8,7 +8,14 @@ from opentools.core.bundles import cached_bundle_for
 from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
 from opentools.core.types import FrameworkName, ModelName
 
-from .schemas import Account, Asset, Clock, Order, Position
+from ..schemas import (
+    Account,
+    Asset,
+    Clock,
+    Order,
+    PortfolioHistory,
+    Position,
+)
 
 
 class TradingProviderClient(Protocol):
@@ -53,26 +60,21 @@ class TradingProviderClient(Protocol):
         nested: bool | None = None,
     ) -> dict: ...
 
+    async def get_portfolio_history(
+        self,
+        *,
+        period: str | None = None,
+        timeframe: str | None = None,
+        intraday_reporting: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        pnl_reset: str | None = None,
+        cashflow_types: str | None = None,
+    ) -> dict: ...
+
 
 @dataclass
 class TradingService(Sequence[Any]):
-    """
-    Neutral trading domain service + tool surface.
-
-    Domain:
-      - get_account, list_positions, get_clock, list_assets, list_orders, ...
-
-    Tools:
-      - tool_specs()        -> list[ToolSpec]
-      - bundle()            -> ToolBundle (model-shaped tools)
-      - tools               -> model-shaped tools (from bundle)
-      - framework_tools()   -> framework-shaped tools (e.g. Pydantic-AI)
-      - iteration / indexing:
-            if framework is set     -> framework-shaped tools
-            else                    -> model-shaped tools
-    """
-
-    # required
     client: TradingProviderClient
     account_mapper: Callable[[dict], Account]
     position_mapper: Callable[[dict], Position | None]
@@ -83,6 +85,7 @@ class TradingService(Sequence[Any]):
     framework: FrameworkName | None = None
     asset_mapper: Callable[[dict], Asset | None] | None = None
     order_mapper: Callable[[dict], Order | None] | None = None
+    portfolio_history_mapper: Callable[[dict], PortfolioHistory] | None = None
 
     # service-level tool filters
     include: tuple[str, ...] = field(default_factory=tuple)
@@ -91,8 +94,6 @@ class TradingService(Sequence[Any]):
     _bundle_cache: dict[
         tuple[ModelName, tuple[str, ...], tuple[str, ...]], ToolBundle
     ] = field(default_factory=dict, init=False, repr=False)
-
-    # ---- provider metadata ----
 
     @property
     def provider(self) -> str:
@@ -216,6 +217,33 @@ class TradingService(Sequence[Any]):
         raw = await self.client.get_order(order_id, nested=nested)
         return self.order_mapper(raw)
 
+    async def get_portfolio_history(
+        self,
+        *,
+        period: str | None = None,
+        timeframe: str | None = None,
+        intraday_reporting: str | None = None,
+        start: str | None = None,
+        end: str | None = None,
+        pnl_reset: str | None = None,
+        cashflow_types: str | None = None,
+    ) -> PortfolioHistory:
+        if self.portfolio_history_mapper is None:
+            raise NotImplementedError(
+                f"Portfolio history not supported for provider {self.provider!r}"
+            )
+
+        raw = await self.client.get_portfolio_history(
+            period=period,
+            timeframe=timeframe,
+            intraday_reporting=intraday_reporting,
+            start=start,
+            end=end,
+            pnl_reset=pnl_reset,
+            cashflow_types=cashflow_types,
+        )
+        return self.portfolio_history_mapper(raw)
+
     # ---- tool specs & bundling ----
 
     def tool_specs(
@@ -231,8 +259,14 @@ class TradingService(Sequence[Any]):
             from opentools.trading.providers.alpaca.tools import alpaca_tools
 
             specs = alpaca_tools(self)
+
+        elif self.provider == "coinbase":
+            from opentools.trading.providers.coinbase.tools import coinbase_tools
+
+            specs = coinbase_tools(self)
+
         else:
-            raise ValueError(f"Unknown trading provider: {self.provider}")
+            raise ValueError(f"Unknown trading provider: {self.provider!r}")
 
         if effective_include:
             specs = [t for t in specs if t.name in effective_include]
@@ -266,26 +300,16 @@ class TradingService(Sequence[Any]):
         )
 
     def framework_tools(self) -> list[Any]:
-        """
-        Framework-shaped tools (e.g. Pydantic-AI Tool objects).
-
-        Used by __iter__ / __getitem__ when `framework` is set.
-        """
         from opentools.core.frameworks import framework_tools as _fw_tools
 
         return _fw_tools(self)
 
     @property
     def tools(self) -> list[Any]:
-        """
-        Provider-native, model-shaped tools from the bundle.
-        """
         return self.bundle().tools
 
     async def call_tool(self, tool_name: str, tool_input: ToolInput) -> Any:
         return await self.bundle().call(tool_name, tool_input)
-
-    # ---- Sequence interface for Agent(..., tools=svc) ----
 
     def _tool_list_for_iteration(self) -> list[Any]:
         if self.framework is not None:

@@ -34,7 +34,6 @@ def build_bundle(model: ModelName, specs: Sequence[ToolSpec]) -> ToolBundle:
 
         return to_openrouter_bundle(list(specs))
 
-    # should not be ever raised
     raise ValueError(f"Unknown model: {model!r}")
 
 

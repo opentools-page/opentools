@@ -15,9 +15,6 @@ async def list_assets(
     exchange: str | None = None,
     attributes: list[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    GET /v2/assets with optional Alpaca-style filters.
-    """
     params: dict[str, str] = {}
 
     if status is not None:
@@ -38,8 +35,5 @@ async def get_asset(
     transport: AlpacaTransport,
     symbol_or_asset_id: str,
 ) -> dict[str, Any]:
-    """
-    GET /v2/assets/{symbol_or_asset_id}
-    """
     path = ASSET_PATH.format(symbol_or_asset_id=symbol_or_asset_id)
     return await transport.get_dict_json(path)
