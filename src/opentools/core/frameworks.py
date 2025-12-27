@@ -23,11 +23,7 @@ class FrameworkService(Protocol):
 
 
 def framework_tools(service: FrameworkService) -> list[Any]:
-    """
-    Convert a service into framework-ready tools, or fall back
-    to provider-native model-shaped tools.
-    """
-    # No framework configured → return model-shaped tools
+    # no framework configured, return model-shaped tools
     if service.framework is None:
         return list(service.tools)
 

@@ -2,75 +2,32 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, cast
 
 from opentools.core.bundles import cached_bundle_for
+from opentools.core.errors import ProviderError, ValidationError
 from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
 from opentools.core.types import FrameworkName, ModelName
 
 from ..schemas import Account, Asset, Clock, Order, PortfolioHistory, Position
+from .provider import TradingProviderClient
 
 if TYPE_CHECKING:
     from .multi import MultiTradingService
 
 
-class TradingProviderClient(Protocol):
-    provider: str
-
-    async def get_account(self, *args: Any, **kwargs: Any) -> dict: ...
-    async def list_positions(self) -> list[dict]: ...
-    async def get_position(self, symbol_or_asset_id: str) -> dict: ...
-    async def get_clock(self) -> dict: ...
-
-    async def list_assets(
-        self,
-        *,
-        status: str | None = None,
-        asset_class: str | None = None,
-        exchange: str | None = None,
-        attributes: list[str] | None = None,
-    ) -> list[dict]: ...
-
-    async def get_asset(self, symbol_or_asset_id: str) -> dict: ...
-
-    async def list_orders(
-        self,
-        *,
-        status: str | None = None,
-        limit: int | None = None,
-        after: str | None = None,
-        until: str | None = None,
-        direction: str | None = None,
-        nested: bool | None = None,
-        symbols: list[str] | None = None,
-        side: str | None = None,
-        asset_class: list[str] | None = None,
-        before_order_id: str | None = None,
-        after_order_id: str | None = None,
-    ) -> list[dict]: ...
-
-    async def get_order(
-        self,
-        order_id: str,
-        *,
-        nested: bool | None = None,
-    ) -> dict: ...
-
-    async def get_portfolio_history(
-        self,
-        *,
-        period: str | None = None,
-        timeframe: str | None = None,
-        intraday_reporting: str | None = None,
-        start: str | None = None,
-        end: str | None = None,
-        pnl_reset: str | None = None,
-        cashflow_types: str | None = None,
-    ) -> dict: ...
-
-
 @dataclass
 class TradingService(Sequence[Any]):
+    """
+    Canonical trading domain API.
+
+    - Takes a provider-specific client (HTTP + auth + quirks).
+    - Uses mappers to turn raw dicts into canonical Pydantic models with
+      `provider_fields` for everything that doesn’t fit the shared schema.
+    - Exposes a uniform method surface for tools: account, positions,
+      assets, orders, portfolio history.
+    """
+
     client: TradingProviderClient
     account_mapper: Callable[[dict], Account]
     position_mapper: Callable[[dict], Position | None]
@@ -94,24 +51,8 @@ class TradingService(Sequence[Any]):
         return getattr(self.client, "provider", "unknown")
 
     # core api
-
     async def get_account(self, account_uuid: str | None = None) -> Account:
-        if account_uuid is None:
-            raw = await self.client.get_account()
-        else:
-            client_fn = getattr(self.client, "get_account", None)
-            if client_fn is None or not callable(client_fn):
-                raise NotImplementedError(
-                    f"{self.provider!r} client does not support "
-                    "get_account(account_uuid)."
-                )
-
-            typed_client_fn = cast(
-                Callable[[str], Awaitable[dict[str, Any]]],
-                client_fn,
-            )
-            raw = await typed_client_fn(account_uuid.strip())
-
+        raw = await self.client.get_account(account_uuid)
         return self.account_mapper(raw)
 
     async def list_accounts(
@@ -123,8 +64,11 @@ class TradingService(Sequence[Any]):
     ) -> dict[str, Any]:
         client_fn = getattr(self.client, "list_accounts", None)
         if client_fn is None or not callable(client_fn):
-            raise NotImplementedError(
-                f"{self.provider!r} client does not support list_accounts()."
+            raise ProviderError(
+                message=f"{self.provider!r} client does not support list_accounts().",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
             )
 
         typed_client_fn = cast(
@@ -165,8 +109,10 @@ class TradingService(Sequence[Any]):
         limit: int | None = 20,
     ) -> list[Asset]:
         if self.asset_mapper is None:
-            raise NotImplementedError(
-                f"Assets not supported for provider {self.provider!r}"
+            raise ProviderError(
+                message=f"Assets not supported for provider {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
             )
 
         raw_list = await self.client.list_assets(
@@ -177,19 +123,25 @@ class TradingService(Sequence[Any]):
         )
 
         out: list[Asset] = []
+        max_items = limit or len(raw_list)
+
         for item in raw_list:
             a = self.asset_mapper(item)
             if a is not None:
                 out.append(a)
-            if limit is not None and len(out) >= limit:
+            if len(out) >= max_items:
                 break
+
         return out
 
     async def get_asset(self, symbol_or_asset_id: str) -> Asset | None:
         if self.asset_mapper is None:
-            raise NotImplementedError(
-                f"Assets not supported for provider {self.provider!r}"
+            raise ProviderError(
+                message=f"Assets not supported for provider {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
             )
+
         raw = await self.client.get_asset(symbol_or_asset_id)
         return self.asset_mapper(raw)
 
@@ -209,11 +161,26 @@ class TradingService(Sequence[Any]):
         after_order_id: str | None = None,
     ) -> list[Order]:
         if self.order_mapper is None:
-            raise NotImplementedError(
-                f"Orders not supported for provider {self.provider!r}"
+            raise ProviderError(
+                message=f"Orders not supported for provider {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
             )
 
-        raw_list = await self.client.list_orders(
+        client_fn = getattr(self.client, "list_orders", None)
+        if client_fn is None or not callable(client_fn):
+            raise ProviderError(
+                message=f"{self.provider!r} client does not support list_orders().",
+                domain="trading",
+                provider=self.provider,
+            )
+
+        typed_client_fn = cast(
+            Callable[..., Awaitable[list[dict[str, Any]]]],
+            client_fn,
+        )
+
+        raw_list = await typed_client_fn(
             status=status,
             limit=limit,
             after=after,
@@ -239,15 +206,46 @@ class TradingService(Sequence[Any]):
 
     async def get_order(
         self,
-        order_id: str,
+        order_id: str | None = None,
         *,
         nested: bool | None = None,
     ) -> Order | None:
         if self.order_mapper is None:
-            raise NotImplementedError(
-                f"Orders not supported for provider {self.provider!r}"
+            raise ProviderError(
+                message=f"Orders not supported for provider {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
             )
-        raw = await self.client.get_order(order_id, nested=nested)
+
+        if not order_id:
+            # This is precisely the error that bit you before; now it's structured.
+            raise ValidationError(
+                message="order_id is required for get_order().",
+                domain="trading",
+                provider=self.provider,
+                field_errors=[
+                    {
+                        "loc": ["order_id"],
+                        "msg": "missing",
+                        "type": "value_error.missing",
+                    }
+                ],
+            )
+
+        client_fn = getattr(self.client, "get_order", None)
+        if client_fn is None or not callable(client_fn):
+            raise ProviderError(
+                message=f"{self.provider!r} client does not support get_order().",
+                domain="trading",
+                provider=self.provider,
+            )
+
+        typed_client_fn = cast(
+            Callable[..., Awaitable[dict[str, Any]]],
+            client_fn,
+        )
+
+        raw = await typed_client_fn(order_id=order_id, nested=nested)
         return self.order_mapper(raw)
 
     async def get_portfolio_history(
@@ -262,8 +260,10 @@ class TradingService(Sequence[Any]):
         cashflow_types: str | None = None,
     ) -> PortfolioHistory:
         if self.portfolio_history_mapper is None:
-            raise NotImplementedError(
-                f"Portfolio history not supported for provider {self.provider!r}"
+            raise ProviderError(
+                message=f"Portfolio history not supported for provider {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
             )
 
         raw = await self.client.get_portfolio_history(
@@ -298,7 +298,11 @@ class TradingService(Sequence[Any]):
 
             specs = coinbase_tools(ts_self)
         else:
-            raise ValueError(f"Unknown trading provider: {self.provider!r}")
+            raise ProviderError(
+                message=f"Unknown trading provider: {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
+            )
 
         if effective_include:
             specs = [t for t in specs if t.name in effective_include]
@@ -343,8 +347,7 @@ class TradingService(Sequence[Any]):
     async def call_tool(self, tool_name: str, tool_input: ToolInput) -> Any:
         return await self.bundle().call(tool_name, tool_input)
 
-    # iteration
-
+    # sequence, combining
     def _tool_list_for_iteration(self) -> list[Any]:
         if self.framework is not None:
             return self.framework_tools()
@@ -361,7 +364,6 @@ class TradingService(Sequence[Any]):
         return iter(self._tool_list_for_iteration())
 
     # adding
-
     def __add__(self, other: Any) -> MultiTradingService:
         from .multi import MultiTradingService, combine  # runtime import
 

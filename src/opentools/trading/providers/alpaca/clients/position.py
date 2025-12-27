@@ -7,18 +7,11 @@ from ..transport import AlpacaTransport
 
 
 async def list_positions(transport: AlpacaTransport) -> list[dict[str, Any]]:
-    """
-    GET /v2/positions
-    """
     return await transport.get_list_json(POSITIONS_PATH)
 
 
 async def get_position(
     transport: AlpacaTransport, symbol_or_asset_id: str
 ) -> dict[str, Any]:
-    """
-    GET /v2/positions/{symbol_or_asset_id}
-    """
-
     path = POSITION_PATH.format(symbol_or_asset_id=symbol_or_asset_id)
     return await transport.get_dict_json(path)

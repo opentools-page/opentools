@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .._endpoints import PORTFOLIO_HISTORY_PATH
 from ..transport import AlpacaTransport
 
 
@@ -16,14 +17,6 @@ async def get_portfolio_history(
     pnl_reset: str | None = None,
     cashflow_types: str | None = None,
 ) -> dict[str, Any]:
-    """
-    Thin HTTP wrapper over:
-      GET /v2/account/portfolio/history
-
-    All arguments are already RFC3339 / Alpaca-compatible strings or None.
-    This function is deliberately dumb: it just builds query params and
-    returns dict JSON via the transport.
-    """
     params: list[str] = []
 
     if period is not None:
@@ -41,7 +34,7 @@ async def get_portfolio_history(
     if cashflow_types is not None:
         params.append(f"cashflow_types={cashflow_types}")
 
-    path = "/v2/account/portfolio/history"
+    path = PORTFOLIO_HISTORY_PATH
     if params:
         path = f"{path}?{'&'.join(params)}"
 

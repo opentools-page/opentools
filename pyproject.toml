@@ -20,6 +20,7 @@ dependencies = [
   "openai>=2.14.0",
   "pydantic>=2.12.5",
   "pydantic-ai>=1.38.0",
+  "pydantic-ai-slim[google]>=1.38.0",
   "pynacl>=1.6.1",
   "python-dotenv>=1.2.1",
 ]

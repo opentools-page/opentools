@@ -15,6 +15,7 @@ Requires-Dist: ollama>=0.6.1
 Requires-Dist: openai>=2.14.0
 Requires-Dist: pydantic>=2.12.5
 Requires-Dist: pydantic-ai>=1.38.0
+Requires-Dist: pydantic-ai-slim[google]>=1.38.0
 Requires-Dist: pynacl>=1.6.1
 Requires-Dist: python-dotenv>=1.2.1
 

@@ -19,3 +19,6 @@ CLOCK_PATH = "/v2/clock"
 # orders
 ORDERS_PATH = "/v2/orders"
 ORDER_PATH = "/v2/orders/{order_id}"
+
+# portfolio history
+PORTFOLIO_HISTORY_PATH = f"{ACCOUNT_PATH}/portfolio/history"

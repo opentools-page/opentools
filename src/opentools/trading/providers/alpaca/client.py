@@ -21,25 +21,35 @@ from .transport import AlpacaTransport
 
 @dataclass
 class AlpacaClient:
-    """
-    Thin wrapper around Alpaca HTTP client functions.
-    """
-
     transport: AlpacaTransport
     provider: str = "alpaca"
 
-    async def get_account(self) -> dict[str, Any]:
+    # account
+    async def get_account(self, account_uuid: str | None = None) -> dict[str, Any]:
         return await get_account(self.transport)
 
+    # not implemented by alpaca
+    async def list_accounts(
+        self,
+        *,
+        limit: int | None = None,
+        cursor: str | None = None,
+        retail_portfolio_id: str | None = None,
+    ) -> dict[str, Any]:
+        raise NotImplementedError("list_accounts is not supported for AlpacaClient")
+
+    # positions
     async def list_positions(self) -> list[dict[str, Any]]:
         return await list_positions(self.transport)
 
     async def get_position(self, symbol_or_asset_id: str) -> dict[str, Any]:
         return await get_position(self.transport, symbol_or_asset_id)
 
+    # clock
     async def get_clock(self) -> dict[str, Any]:
         return await get_clock(self.transport)
 
+    # assets
     async def list_assets(
         self,
         *,
@@ -59,6 +69,7 @@ class AlpacaClient:
     async def get_asset(self, symbol_or_asset_id: str) -> dict[str, Any]:
         return await _get_asset(self.transport, symbol_or_asset_id)
 
+    # orders
     async def list_orders(
         self,
         *,
@@ -97,6 +108,7 @@ class AlpacaClient:
     ) -> dict[str, Any]:
         return await _get_order(self.transport, order_id=order_id, nested=nested)
 
+    # portfolio
     async def get_portfolio_history(
         self,
         *,

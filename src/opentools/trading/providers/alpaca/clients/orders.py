@@ -59,9 +59,6 @@ async def get_order(
     *,
     nested: bool | None = None,
 ) -> dict[str, Any]:
-    """
-    GET /v2/orders/{order_id}
-    """
     path = ORDER_PATH.format(order_id=order_id)
 
     params: dict[str, str] = {}

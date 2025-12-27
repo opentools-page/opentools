@@ -28,8 +28,6 @@ class MultiTradingService(Sequence[Any]):
         providers = {svc.provider for svc in self.services}
         return ",".join(sorted(providers))
 
-    # ---------------------- tool specs & bundling -----------------------
-
     def tool_specs(
         self,
         *,
@@ -40,7 +38,6 @@ class MultiTradingService(Sequence[Any]):
         effective_exclude = set(exclude or self.exclude)
 
         specs: list[ToolSpec] = []
-        # Let each service decide its own provider-specific specs
         for svc in self.services:
             specs.extend(svc.tool_specs())
 
@@ -102,33 +99,23 @@ class MultiTradingService(Sequence[Any]):
     def __iter__(self) -> Iterator[Any]:
         return iter(self._tool_list_for_iteration())
 
-    # adding objects together
     def __add__(
         self, other: TradingService | MultiTradingService
     ) -> MultiTradingService:
-        """
-        Support `multi + single` and `multi + multi`.
-        """
-        if isinstance(other, TradingService):
-            services = (*self.services, other)
-        elif isinstance(other, MultiTradingService):
-            services = (*self.services, *other.services)
-        else:
+        from .multi import combine  # runtime import
+
+        if not isinstance(other, (TradingService, MultiTradingService)):
             return NotImplemented  # type: ignore[return-value]
+        return combine(self, other)
 
-        base_model = self.model
-        for svc in services:
-            if svc.model != base_model:
-                raise ValueError(
-                    f"Cannot combine TradingService with different models: "
-                    f"{base_model!r} vs {svc.model!r}"
-                )
+    def __radd__(self, other: Any) -> MultiTradingService:
+        from .multi import combine  # runtime import
 
-        return MultiTradingService(
-            services=tuple(services),
-            model=base_model,
-            framework=self.framework,
-        )
+        if other == 0:
+            return combine(self)
+        if isinstance(other, (TradingService, MultiTradingService)):
+            return combine(other, self)
+        return NotImplemented  # type: ignore[return-value]
 
 
 def combine(*services: TradingService | MultiTradingService) -> MultiTradingService:
@@ -138,9 +125,9 @@ def combine(*services: TradingService | MultiTradingService) -> MultiTradingServ
 
     for svc in services:
         if isinstance(svc, MultiTradingService):
-            inner = list(svc.services)
+            inner = svc.services
         else:
-            inner = [svc]
+            inner = (svc,)
 
         for s in inner:
             if model is None:
@@ -150,8 +137,16 @@ def combine(*services: TradingService | MultiTradingService) -> MultiTradingServ
                     f"Cannot combine TradingService with different models: "
                     f"{model!r} vs {s.model!r}"
                 )
-            if framework is None:
-                framework = s.framework
+
+            if s.framework is not None:
+                if framework is None:
+                    framework = s.framework
+                elif framework != s.framework:
+                    raise ValueError(
+                        f"Cannot combine TradingService with different frameworks: "
+                        f"{framework!r} vs {s.framework!r}"
+                    )
+
             flat.append(s)
 
     if not flat:
