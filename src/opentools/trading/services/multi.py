@@ -8,7 +8,7 @@ from opentools.core.bundles import cached_bundle_for
 from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
 from opentools.core.types import FrameworkName, ModelName
 
-from .base import TradingService
+from .core import TradingService
 
 
 @dataclass
@@ -28,6 +28,8 @@ class MultiTradingService(Sequence[Any]):
         providers = {svc.provider for svc in self.services}
         return ",".join(sorted(providers))
 
+    # ---------------------- tool specs & bundling -----------------------
+
     def tool_specs(
         self,
         *,
@@ -38,6 +40,7 @@ class MultiTradingService(Sequence[Any]):
         effective_exclude = set(exclude or self.exclude)
 
         specs: list[ToolSpec] = []
+        # Let each service decide its own provider-specific specs
         for svc in self.services:
             specs.extend(svc.tool_specs())
 
@@ -98,3 +101,64 @@ class MultiTradingService(Sequence[Any]):
 
     def __iter__(self) -> Iterator[Any]:
         return iter(self._tool_list_for_iteration())
+
+    # adding objects together
+    def __add__(
+        self, other: TradingService | MultiTradingService
+    ) -> MultiTradingService:
+        """
+        Support `multi + single` and `multi + multi`.
+        """
+        if isinstance(other, TradingService):
+            services = (*self.services, other)
+        elif isinstance(other, MultiTradingService):
+            services = (*self.services, *other.services)
+        else:
+            return NotImplemented  # type: ignore[return-value]
+
+        base_model = self.model
+        for svc in services:
+            if svc.model != base_model:
+                raise ValueError(
+                    f"Cannot combine TradingService with different models: "
+                    f"{base_model!r} vs {svc.model!r}"
+                )
+
+        return MultiTradingService(
+            services=tuple(services),
+            model=base_model,
+            framework=self.framework,
+        )
+
+
+def combine(*services: TradingService | MultiTradingService) -> MultiTradingService:
+    flat: list[TradingService] = []
+    model: ModelName | None = None
+    framework: FrameworkName | None = None
+
+    for svc in services:
+        if isinstance(svc, MultiTradingService):
+            inner = list(svc.services)
+        else:
+            inner = [svc]
+
+        for s in inner:
+            if model is None:
+                model = s.model
+            elif s.model != model:
+                raise ValueError(
+                    f"Cannot combine TradingService with different models: "
+                    f"{model!r} vs {s.model!r}"
+                )
+            if framework is None:
+                framework = s.framework
+            flat.append(s)
+
+    if not flat:
+        raise ValueError("combine() requires at least one TradingService")
+
+    return MultiTradingService(
+        services=tuple(flat),
+        model=model,  # type: ignore[arg-type]
+        framework=framework,
+    )

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from opentools.core.tools import ToolSpec, tool_handler
+from opentools.trading.services.core import TradingService
 
 
-def alpaca_tools(service) -> list[ToolSpec]:
+def alpaca_tools(service: TradingService) -> list[ToolSpec]:
+    prefix = "alpaca"
+
     return [
         ToolSpec(
-            name="get_account",
+            name=f"{prefix}_get_account",
             description="Get Alpaca account info (cash, equity, buying power).",
             input_schema={
                 "type": "object",
@@ -16,7 +19,7 @@ def alpaca_tools(service) -> list[ToolSpec]:
             handler=tool_handler(service.get_account),
         ),
         ToolSpec(
-            name="list_positions",
+            name=f"{prefix}_list_positions",
             description="List Alpaca open positions.",
             input_schema={
                 "type": "object",
@@ -26,7 +29,7 @@ def alpaca_tools(service) -> list[ToolSpec]:
             handler=tool_handler(service.list_positions),
         ),
         ToolSpec(
-            name="get_clock",
+            name=f"{prefix}_get_clock",
             description="Get the Alpaca trading clock (market open/close info).",
             input_schema={
                 "type": "object",
@@ -36,7 +39,7 @@ def alpaca_tools(service) -> list[ToolSpec]:
             handler=tool_handler(service.get_clock),
         ),
         ToolSpec(
-            name="list_assets",
+            name=f"{prefix}_list_assets",
             description=(
                 "List Alpaca assets (stocks, etc.) with optional filters. "
                 "Use `limit` to cap how many assets are returned."
@@ -77,7 +80,7 @@ def alpaca_tools(service) -> list[ToolSpec]:
             handler=tool_handler(service.list_assets),
         ),
         ToolSpec(
-            name="get_asset",
+            name=f"{prefix}_get_asset",
             description="Get a single Alpaca asset by symbol or asset ID.",
             input_schema={
                 "type": "object",
@@ -93,7 +96,7 @@ def alpaca_tools(service) -> list[ToolSpec]:
             handler=tool_handler(service.get_asset),
         ),
         ToolSpec(
-            name="list_orders",
+            name=f"{prefix}_list_orders",
             description=(
                 "List Alpaca orders with optional filters. "
                 "Use `limit` to cap how many orders are returned."
@@ -161,7 +164,7 @@ def alpaca_tools(service) -> list[ToolSpec]:
             handler=tool_handler(service.list_orders),
         ),
         ToolSpec(
-            name="get_order",
+            name=f"{prefix}_get_order",
             description="Get a single Alpaca order by order ID.",
             input_schema={
                 "type": "object",
@@ -181,7 +184,7 @@ def alpaca_tools(service) -> list[ToolSpec]:
             handler=tool_handler(service.get_order),
         ),
         ToolSpec(
-            name="get_portfolio_history",
+            name=f"{prefix}_get_portfolio_history",
             description=(
                 "Get Alpaca account portfolio history (equity and P&L timeseries). "
                 "Use period/timeframe for range, and intraday_reporting/pnl_reset "

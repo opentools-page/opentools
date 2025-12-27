@@ -2,26 +2,22 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Protocol, cast
 
 from opentools.core.bundles import cached_bundle_for
 from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
 from opentools.core.types import FrameworkName, ModelName
 
-from ..schemas import (
-    Account,
-    Asset,
-    Clock,
-    Order,
-    PortfolioHistory,
-    Position,
-)
+from ..schemas import Account, Asset, Clock, Order, PortfolioHistory, Position
+
+if TYPE_CHECKING:
+    from .multi import MultiTradingService
 
 
 class TradingProviderClient(Protocol):
     provider: str
 
-    async def get_account(self) -> dict: ...
+    async def get_account(self, *args: Any, **kwargs: Any) -> dict: ...
     async def list_positions(self) -> list[dict]: ...
     async def get_position(self, symbol_or_asset_id: str) -> dict: ...
     async def get_clock(self) -> dict: ...
@@ -81,13 +77,11 @@ class TradingService(Sequence[Any]):
     clock_mapper: Callable[[dict], Clock]
     model: ModelName
 
-    # optional config / mappers
     framework: FrameworkName | None = None
     asset_mapper: Callable[[dict], Asset | None] | None = None
     order_mapper: Callable[[dict], Order | None] | None = None
     portfolio_history_mapper: Callable[[dict], PortfolioHistory] | None = None
 
-    # service-level tool filters
     include: tuple[str, ...] = field(default_factory=tuple)
     exclude: tuple[str, ...] = field(default_factory=tuple)
 
@@ -99,11 +93,50 @@ class TradingService(Sequence[Any]):
     def provider(self) -> str:
         return getattr(self.client, "provider", "unknown")
 
-    # ---- core domain ----
+    # core api
 
-    async def get_account(self) -> Account:
-        raw = await self.client.get_account()
+    async def get_account(self, account_uuid: str | None = None) -> Account:
+        if account_uuid is None:
+            raw = await self.client.get_account()
+        else:
+            client_fn = getattr(self.client, "get_account", None)
+            if client_fn is None or not callable(client_fn):
+                raise NotImplementedError(
+                    f"{self.provider!r} client does not support "
+                    "get_account(account_uuid)."
+                )
+
+            typed_client_fn = cast(
+                Callable[[str], Awaitable[dict[str, Any]]],
+                client_fn,
+            )
+            raw = await typed_client_fn(account_uuid.strip())
+
         return self.account_mapper(raw)
+
+    async def list_accounts(
+        self,
+        *,
+        limit: int | None = None,
+        cursor: str | None = None,
+        retail_portfolio_id: str | None = None,
+    ) -> dict[str, Any]:
+        client_fn = getattr(self.client, "list_accounts", None)
+        if client_fn is None or not callable(client_fn):
+            raise NotImplementedError(
+                f"{self.provider!r} client does not support list_accounts()."
+            )
+
+        typed_client_fn = cast(
+            Callable[..., Awaitable[dict[str, Any]]],
+            client_fn,
+        )
+
+        return await typed_client_fn(
+            limit=limit,
+            cursor=cursor,
+            retail_portfolio_id=retail_portfolio_id,
+        )
 
     async def list_positions(self) -> list[Position]:
         raw_list = await self.client.list_positions()
@@ -244,8 +277,7 @@ class TradingService(Sequence[Any]):
         )
         return self.portfolio_history_mapper(raw)
 
-    # ---- tool specs & bundling ----
-
+    # tools and bundling
     def tool_specs(
         self,
         *,
@@ -255,16 +287,16 @@ class TradingService(Sequence[Any]):
         effective_include = set(include or self.include)
         effective_exclude = set(exclude or self.exclude)
 
+        ts_self = cast("TradingService", self)
+
         if self.provider == "alpaca":
             from opentools.trading.providers.alpaca.tools import alpaca_tools
 
-            specs = alpaca_tools(self)
-
+            specs = alpaca_tools(ts_self)
         elif self.provider == "coinbase":
             from opentools.trading.providers.coinbase.tools import coinbase_tools
 
-            specs = coinbase_tools(self)
-
+            specs = coinbase_tools(ts_self)
         else:
             raise ValueError(f"Unknown trading provider: {self.provider!r}")
 
@@ -311,6 +343,8 @@ class TradingService(Sequence[Any]):
     async def call_tool(self, tool_name: str, tool_input: ToolInput) -> Any:
         return await self.bundle().call(tool_name, tool_input)
 
+    # iteration
+
     def _tool_list_for_iteration(self) -> list[Any]:
         if self.framework is not None:
             return self.framework_tools()
@@ -325,3 +359,24 @@ class TradingService(Sequence[Any]):
 
     def __iter__(self) -> Iterator[Any]:
         return iter(self._tool_list_for_iteration())
+
+    # adding
+
+    def __add__(self, other: Any) -> MultiTradingService:
+        from .multi import MultiTradingService, combine  # runtime import
+
+        if not isinstance(other, (TradingService, MultiTradingService)):
+            return NotImplemented  # type: ignore[return-value]
+
+        return combine(self, other)
+
+    def __radd__(self, other: Any) -> MultiTradingService:
+        from .multi import MultiTradingService, combine  # runtime import
+
+        if other == 0:
+            return combine(self)
+
+        if isinstance(other, (TradingService, MultiTradingService)):
+            return combine(other, self)
+
+        return NotImplemented  # type: ignore[return-value]

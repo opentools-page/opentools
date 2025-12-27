@@ -32,17 +32,21 @@ class CoinbaseClient:
         )
 
     async def get_account(self, account_uuid: str | None = None) -> dict[str, Any]:
+        # If UUID provided → hit GET /accounts/{uuid}
         if account_uuid:
-            return await _get_account(self.transport, account_uuid)
+            data = await _get_account(self.transport, account_uuid)
+            # Some Coinbase responses wrap in "account"
+            account = data.get("account") or data
+            return account
 
+        # No UUID → treat as "primary" account = first from list_accounts
         data = await _list_accounts(self.transport, limit=1)
         accounts = data.get("accounts") or []
         if not accounts:
             return {}
         return accounts[0]
 
-    # stubs
-
+    # stubs (unchanged)
     async def list_positions(self) -> list[dict[str, Any]]:
         raise NotImplementedError("Positions not implemented for Coinbase yet")
 

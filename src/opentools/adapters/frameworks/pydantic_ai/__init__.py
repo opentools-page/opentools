@@ -25,10 +25,10 @@ def _tools_from_specs(
 
     for spec in specs:
         safe_name = spec.name
-        description = spec.description
+        description = spec.description or ""
 
         async def _fn(
-            ctx,  # type: ignore[unused-argument]
+            ctx,
             _tool_name: str = safe_name,
             **kwargs: Any,
         ) -> Any:
