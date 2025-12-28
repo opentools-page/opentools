@@ -29,7 +29,6 @@ async def list_orders(
         params["product_ids"] = product_ids
 
     if order_status:
-        # Coinbase expects a list of statuses
         params["order_status"] = [order_status]
 
     if order_side:

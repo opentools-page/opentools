@@ -20,3 +20,6 @@ ORDERS_PREVIEW_PATH = f"{_API_PREFIX}/orders/preview"
 # products (assets)
 PRODUCTS_PATH = f"{_API_PREFIX}/products"
 PRODUCT_PATH = f"{_API_PREFIX}/products/{{product_id}}"
+
+# portfolios
+PORTFOLIOS_PATH = "/api/v3/brokerage/portfolios"

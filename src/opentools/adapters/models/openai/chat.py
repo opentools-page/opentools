@@ -46,7 +46,7 @@ async def run_with_tools(
                 status_code=getattr(e, "status_code", None),
                 request_id=getattr(e, "request_id", None),
                 details=getattr(e, "body", None),
-            ) from None  # ← kills the chained traceback
+            ) from None
         except APIError as e:
             raise ProviderError(
                 message=str(e),

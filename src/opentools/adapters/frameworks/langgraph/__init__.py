@@ -67,7 +67,6 @@ def _json_schema_to_model(name: str, schema: Dict[str, Any]) -> type[BaseModel]:
         elif t == "boolean":
             py_type = bool
         elif t == "array":
-            # Best-effort: look at items.type, default to str
             items_schema = prop.get("items") or {}
             item_type_str = items_schema.get("type", "string")
 
@@ -106,11 +105,9 @@ def _make_langgraph_tool(service: ToolService, spec: ToolSpec) -> Any:
     else:
         ArgsModel = _EmptyArgs
 
-    # async implementation (real one)
     async def _fn_async(**kwargs: Any) -> Any:
         return await service.call_tool(safe_name, kwargs)
 
-    # sync wrapper so ToolNode can call .invoke()
     def _fn_sync(**kwargs: Any) -> Any:
         return asyncio.run(service.call_tool(safe_name, kwargs))
 
@@ -122,8 +119,8 @@ def _make_langgraph_tool(service: ToolService, spec: ToolSpec) -> Any:
     tool = StructuredTool(
         name=safe_name,
         description=description,
-        func=_fn_sync,  # sync path (ToolNode _execute_tool_sync)
-        coroutine=_fn_async,  # async path if you ever use ainvoke
+        func=_fn_sync,
+        coroutine=_fn_async,
         args_schema=ArgsModel,
     )
 

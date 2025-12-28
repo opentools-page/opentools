@@ -30,67 +30,30 @@ from opentools.trading.providers.coinbase.mappers import (
     asset_from_coinbase,
     clock_from_coinbase,
     order_from_coinbase,
-    portfolio_history_from_coinbase,
     position_from_coinbase,
 )
 from opentools.trading.providers.coinbase.transport import CoinbaseTransport
 from opentools.trading.services import TradingService
 
-# -----------------
-# Alpaca
-# -----------------
 
-
+# alpaca
 def _resolve_alpaca_auth(
     *,
     auth: Any | None,
     api_key: str | None,
     api_secret: str | None,
-    key_id: str | None,
-    secret_key: str | None,
-) -> Any:
+) -> AlpacaAuth:
     if api_key and api_secret:
         return AlpacaAuth(key_id=api_key, secret_key=api_secret)
 
-    if key_id and secret_key:
-        return AlpacaAuth(key_id=key_id, secret_key=secret_key)
+    if isinstance(auth, AlpacaAuth):
+        return auth
 
-    if isinstance(auth, Mapping):
-        if "api_key" in auth and "api_secret" in auth:
-            return AlpacaAuth(
-                key_id=str(auth["api_key"]),
-                secret_key=str(auth["api_secret"]),
-            )
-
-        if "key_id" in auth and "secret_key" in auth:
-            return AlpacaAuth(
-                key_id=str(auth["key_id"]),
-                secret_key=str(auth["secret_key"]),
-            )
-
-        if "APCA-API-KEY-ID" in auth and "APCA-API-SECRET-KEY" in auth:
-            return HeaderAuth(headers_dict=dict(auth))
-
-        raise AuthError(
-            message=(
-                "Invalid Alpaca auth mapping. Expected either "
-                "{api_key, api_secret}, {key_id, secret_key} "
-                "or raw APCA-* headers."
-            ),
-            domain="trading",
-            provider="alpaca",
-            details=dict(auth),
-        )
-
-    # 3) Direct auth objects
     if auth is not None:
-        if isinstance(auth, (AlpacaAuth, HeaderAuth)):
-            return auth
-
         raise AuthError(
             message=(
-                "Invalid Alpaca auth object. Expected AlpacaAuth, HeaderAuth "
-                "or a valid mapping / api_key+api_secret."
+                "Invalid Alpaca auth object. Only two patterns are supported: "
+                "api_key + api_secret, or an explicit AlpacaAuth instance."
             ),
             domain="trading",
             provider="alpaca",
@@ -98,7 +61,7 @@ def _resolve_alpaca_auth(
         )
 
     raise AuthError(
-        message="Missing Alpaca auth. Provide api_key+api_secret or an auth mapping.",
+        message="Missing Alpaca auth. Provide api_key+api_secret.",
         domain="trading",
         provider="alpaca",
     )
@@ -106,11 +69,9 @@ def _resolve_alpaca_auth(
 
 def alpaca(
     *,
-    auth: Any | None = None,
     api_key: str | None = None,
     api_secret: str | None = None,
-    key_id: str | None = None,
-    secret_key: str | None = None,
+    auth: Any | None = None,
     paper: bool = True,
     timeout: float = 30.0,
     model: ModelName,
@@ -118,33 +79,20 @@ def alpaca(
     include: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
 ) -> TradingService:
-    """
-    Factory for an Alpaca-backed TradingService.
-
-    Recommended usage (new-style):
-
-        alpaca(
-            api_key="...",
-            api_secret="...",
-            model="ollama",
-        )
-
-    """
-
     base_url = ALPACA_PAPER_URL if paper else ALPACA_LIVE_URL
+    env = "paper" if paper else "live"
 
     alpaca_auth = _resolve_alpaca_auth(
         auth=auth,
         api_key=api_key,
         api_secret=api_secret,
-        key_id=key_id,
-        secret_key=secret_key,
     )
 
     transport = AlpacaTransport(
         auth=alpaca_auth,
         base_url=base_url,
         timeout=timeout,
+        environment=env,
     )
     client = AlpacaClient(transport=transport)
 
@@ -166,9 +114,7 @@ def alpaca(
     )
 
 
-# Coinbase
-
-
+# coinbase
 def _resolve_coinbase_auth(
     *,
     auth: Any | None,
@@ -177,17 +123,57 @@ def _resolve_coinbase_auth(
     bearer_token: str | None,
     host: str,
 ) -> Any:
-    if api_key and api_secret:
+    explicit_api_creds = bool(api_key or api_secret)
+    explicit_bearer = bool(bearer_token)
+
+    if explicit_api_creds and explicit_bearer:
+        raise AuthError(
+            message=(
+                "Ambiguous Coinbase auth configuration: both api_key/api_secret and "
+                "bearer_token were provided. Use either PEM-backed api_key + api_secret "
+                "or a pre-built bearer_token, not both."
+            ),
+            domain="trading",
+            provider="coinbase",
+            details={
+                "has_api_key": bool(api_key),
+                "has_api_secret": bool(api_secret),
+                "has_bearer_token": bool(bearer_token),
+            },
+        )
+
+    if explicit_api_creds:
+        if not (api_key and api_secret):
+            raise AuthError(
+                message=(
+                    "Incomplete Coinbase credentials: both api_key and api_secret "
+                    "(the PEM private key) are required."
+                ),
+                domain="trading",
+                provider="coinbase",
+                details={
+                    "has_api_key": bool(api_key),
+                    "has_api_secret": bool(api_secret),
+                },
+            )
+
         return CoinbaseAuth(
             api_key=api_key,
             api_secret=api_secret,
             host=host,
         )
 
-    if bearer_token:
+    if explicit_bearer:
         return BearerTokenAuth(token=bearer_token)
 
     if isinstance(auth, Mapping):
+        if "key_name" in auth and "private_key" in auth:
+            return CoinbaseAuth(
+                api_key=str(auth["key_name"]),
+                api_secret=str(auth["private_key"]),
+                host=host,
+            )
+
         if "api_key" in auth and "api_secret" in auth:
             return CoinbaseAuth(
                 api_key=str(auth["api_key"]),
@@ -195,14 +181,14 @@ def _resolve_coinbase_auth(
                 host=host,
             )
 
-        # Raw "Authorization" header
         if "Authorization" in auth:
             return HeaderAuth(headers_dict=dict(auth))
 
         raise AuthError(
             message=(
                 "Invalid Coinbase auth mapping. Expected either "
-                "{api_key, api_secret} or an Authorization header."
+                "{api_key, api_secret}, {key_name, private_key}, "
+                "or an Authorization header."
             ),
             domain="trading",
             provider="coinbase",
@@ -224,7 +210,10 @@ def _resolve_coinbase_auth(
         )
 
     raise AuthError(
-        message="Missing Coinbase auth. Provide api_key+api_secret or a bearer token.",
+        message=(
+            "Missing Coinbase auth. Provide api_key+api_secret (PEM private key) "
+            "or a bearer_token / Authorization header."
+        ),
         domain="trading",
         provider="coinbase",
     )
@@ -236,7 +225,7 @@ def coinbase(
     api_key: str | None = None,
     api_secret: str | None = None,
     bearer_token: str | None = None,
-    paper: bool = True,
+    paper: bool = False,
     timeout: float = 30.0,
     model: ModelName,
     framework: FrameworkName | None = None,
@@ -255,10 +244,13 @@ def coinbase(
         host=host,
     )
 
+    env = "paper" if paper else "live"
+
     transport = CoinbaseTransport(
         auth=cb_auth,
         base_url=base_url,
         timeout=timeout,
+        environment=env,
     )
     client = CoinbaseClient(transport=transport)
 
@@ -272,7 +264,6 @@ def coinbase(
         clock_mapper=clock_from_coinbase,
         asset_mapper=asset_from_coinbase,
         order_mapper=order_from_coinbase,
-        portfolio_history_mapper=portfolio_history_from_coinbase,
         model=model,
         framework=framework,
         include=inc_tools,

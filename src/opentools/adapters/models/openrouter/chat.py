@@ -40,7 +40,6 @@ async def run_with_tools(
                 tools=service.tools,
                 tool_choice="auto",
                 max_tokens=max_tokens,
-                # only if necessary
                 extra_headers=extra_headers or None,
             )
         except OpenAIRateLimitError as e:
@@ -80,7 +79,6 @@ async def run_with_tools(
                 }
             )
 
-            # execute tools
             for tc in tool_calls:
                 func = getattr(tc, "function", None)
                 if func is None:
@@ -103,7 +101,7 @@ async def run_with_tools(
                     }
                 )
 
-            # loop again for model to see tool results
+            # loop again
             continue
 
         content = msg.content

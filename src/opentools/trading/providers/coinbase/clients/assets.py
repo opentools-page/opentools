@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .._endpoints import PRODUCTS_PATH
+from .._endpoints import PRODUCT_PATH, PRODUCTS_PATH
 from ..transport import CoinbaseTransport
 
 
@@ -10,7 +10,7 @@ async def list_assets(
     transport: CoinbaseTransport,
     *,
     status: str | None = None,  # unused
-    asset_class: str | None = None,  # product type for Coinbase
+    asset_class: str | None = None,  # product type
     exchange: str | None = None,  # unused
     attributes: list[str] | None = None,
     limit: int | None = None,
@@ -42,3 +42,19 @@ async def list_assets(
     data = await transport.get_dict_json(PRODUCTS_PATH, params=params)
     products = data.get("products") or []
     return products
+
+
+async def get_asset(
+    transport: CoinbaseTransport,
+    product_id: str,
+    *,
+    get_tradability_status: bool | None = None,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+
+    if get_tradability_status is not None:
+        params["get_tradability_status"] = get_tradability_status
+
+    path = PRODUCT_PATH.format(product_id=product_id)
+    data = await transport.get_dict_json(path, params=params)
+    return data

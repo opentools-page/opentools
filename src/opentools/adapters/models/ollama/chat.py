@@ -32,7 +32,6 @@ async def run_with_tools(
                 stream=False,
             )
         except ResponseError as exc:
-            # HTTP / provider error from Ollama
             raise ProviderError(
                 message=str(exc),
                 domain="llm",
@@ -41,7 +40,6 @@ async def run_with_tools(
                 details=getattr(exc, "error", None),
             ) from None
         except (ConnectionError, OSError) as exc:
-            # host not reachable, wrong host, daemon not running
             raise TransientError(
                 message=(
                     "Failed to reach Ollama host. "
@@ -69,7 +67,6 @@ async def run_with_tools(
                 details=repr(resp),
             )
 
-        # add assistant turn with any tool_calls, just like docs
         messages.append(message)
 
         tool_calls = getattr(message, "tool_calls", None)
@@ -101,7 +98,6 @@ async def run_with_tools(
                 if raw_args is None and isinstance(func, dict):
                     raw_args = func.get("arguments")
 
-                # normalise args -> dict
                 if isinstance(raw_args, str):
                     try:
                         args = json.loads(raw_args)
@@ -124,7 +120,6 @@ async def run_with_tools(
 
             continue
 
-        # no tool calls
         content = getattr(message, "content", None)
         if content is None and isinstance(message, dict):
             content = message.get("content")

@@ -3,14 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal, cast
 
-from ...schemas import (
-    Account,
-    Asset,
-    Clock,
-    Order,
-    PortfolioHistory,
-    Position,
-)
+from ...schemas import Account, Asset, Clock, Order, Portfolio, Position
 
 
 def _parse_dt(s: str | None) -> datetime | None:
@@ -156,6 +149,22 @@ def asset_from_coinbase(data: dict[str, Any]) -> Asset | None:
     )
 
 
+# portfolios
+def portfolio_from_coinbase(data: dict[str, Any]) -> Portfolio | None:
+    uuid = data.get("uuid")
+    if not uuid:
+        return None
+
+    return Portfolio(
+        provider="coinbase",
+        id=uuid,
+        name=data.get("name"),
+        type=data.get("type"),
+        deleted=data.get("deleted"),
+        provider_fields=dict(data),
+    )
+
+
 # stubs
 def position_from_coinbase(data: dict[str, Any]) -> Position | None:
     return None
@@ -168,16 +177,5 @@ def clock_from_coinbase(data: dict[str, Any]) -> Clock:
         is_open=None,
         next_open=None,
         next_close=None,
-        provider_fields=dict(data),
-    )
-
-
-def portfolio_history_from_coinbase(data: dict[str, Any]) -> PortfolioHistory:
-    return PortfolioHistory(
-        provider="coinbase",
-        timeframe=None,
-        base_value=None,
-        base_value_asof=None,
-        points=[],
         provider_fields=dict(data),
     )

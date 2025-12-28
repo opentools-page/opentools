@@ -68,9 +68,7 @@ def _make_tool(service: ToolService, spec: ToolSpec) -> PydanticTool:
     safe_name = spec.name
     description = _build_description(spec)
 
-    # No ctx here. The tool just sees validated keyword args.
     async def _fn(**kwargs: Any) -> Any:
-        # Strip out None values so you don't spam the provider
         payload = {k: v for k, v in kwargs.items() if v is not None}
         return await service.call_tool(safe_name, payload)
 

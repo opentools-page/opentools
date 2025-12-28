@@ -10,6 +10,7 @@ class TradingModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+# account
 class Account(TradingModel):
     provider: str | None = None
     id: str | None = None
@@ -23,6 +24,7 @@ class Account(TradingModel):
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
 
+# position
 class Position(TradingModel):
     provider: str | None = None
     symbol: str
@@ -36,6 +38,7 @@ class Position(TradingModel):
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
 
+# clock (trading times - fiat only)
 class Clock(TradingModel):
     provider: str | None = None
     timestamp: datetime | None = None
@@ -45,6 +48,7 @@ class Clock(TradingModel):
     provider_fields: Dict[str, Any] = Field(default_factory=dict)
 
 
+# assets
 class Asset(TradingModel):
     provider: str | None = None
     id: str | None = None
@@ -61,6 +65,7 @@ class Asset(TradingModel):
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
 
+# order
 class Order(TradingModel):
     provider: str | None = None
 
@@ -88,13 +93,7 @@ class Order(TradingModel):
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
 
-class PortfolioHistoryPoint(TradingModel):
-    timestamp: datetime
-    equity: float
-    profit_loss: float | None = None
-    profit_loss_pct: float | None = None
-
-
+# portfolio
 class PortfolioHistory(TradingModel):
     provider: str | None = None
     timeframe: str | None = None
@@ -104,3 +103,19 @@ class PortfolioHistory(TradingModel):
 
     points: List[PortfolioHistoryPoint] = Field(default_factory=list)
     provider_fields: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PortfolioHistoryPoint(TradingModel):
+    timestamp: datetime
+    equity: float
+    profit_loss: float | None = None
+    profit_loss_pct: float | None = None
+
+
+class Portfolio(TradingModel):
+    provider: str | None = None
+    id: str | None = None
+    name: str | None = None
+    type: str | None = None
+    deleted: bool | None = None
+    provider_fields: dict[str, Any] = Field(default_factory=dict)

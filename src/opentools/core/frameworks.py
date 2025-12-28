@@ -23,7 +23,6 @@ class FrameworkService(Protocol):
 
 
 def framework_tools(service: FrameworkService) -> list[Any]:
-    # no framework configured, return model-shaped tools
     if service.framework is None:
         return list(service.tools)
 

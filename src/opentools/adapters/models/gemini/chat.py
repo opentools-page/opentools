@@ -132,7 +132,6 @@ async def run_with_tools(
 
             continue
 
-        # no function call
         text = response.text or ""
         if text:
             final_chunks.append(text)

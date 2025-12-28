@@ -20,12 +20,6 @@ if TYPE_CHECKING:
 class TradingService(Sequence[Any]):
     """
     Canonical trading domain API.
-
-    - Takes a provider-specific client (HTTP + auth + quirks).
-    - Uses mappers to turn raw dicts into canonical Pydantic models with
-      `provider_fields` for everything that doesn’t fit the shared schema.
-    - Exposes a uniform method surface for tools: account, positions,
-      assets, orders, portfolio history.
     """
 
     client: TradingProviderClient
@@ -61,7 +55,7 @@ class TradingService(Sequence[Any]):
         limit: int | None = None,
         cursor: str | None = None,
         retail_portfolio_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> list[Account]:
         client_fn = getattr(self.client, "list_accounts", None)
         if client_fn is None or not callable(client_fn):
             raise ProviderError(
@@ -72,15 +66,40 @@ class TradingService(Sequence[Any]):
             )
 
         typed_client_fn = cast(
-            Callable[..., Awaitable[dict[str, Any]]],
+            Callable[..., Awaitable[Any]],
             client_fn,
         )
 
-        return await typed_client_fn(
+        raw = await typed_client_fn(
             limit=limit,
             cursor=cursor,
             retail_portfolio_id=retail_portfolio_id,
         )
+
+        accounts_raw: list[dict[str, Any]] = []
+
+        if isinstance(raw, dict):
+            maybe_accounts = raw.get("accounts")
+            if isinstance(maybe_accounts, list):
+                accounts_raw = [a for a in maybe_accounts if isinstance(a, dict)]
+            else:
+                accounts_raw = [raw]
+        elif isinstance(raw, list):
+            accounts_raw = [a for a in raw if isinstance(a, dict)]
+        else:
+            raise ProviderError(
+                message="Unexpected list_accounts() response shape from provider.",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        out: list[Account] = []
+        for item in accounts_raw:
+            acc = self.account_mapper(item)
+            out.append(acc)
+
+        return out
 
     async def list_positions(self) -> list[Position]:
         raw_list = await self.client.list_positions()
@@ -96,7 +115,33 @@ class TradingService(Sequence[Any]):
         return self.position_mapper(raw)
 
     async def get_clock(self) -> Clock:
-        raw = await self.client.get_clock()
+        if self.provider == "coinbase":
+            raise ProviderError(
+                message=(
+                    "get_clock() is not supported for provider 'coinbase'. "
+                    "Crypto trades 24/7 and the Coinbase Advanced Trade API "
+                    "does not expose a market-hours clock endpoint."
+                ),
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        client_fn = getattr(self.client, "get_clock", None)
+        if client_fn is None or not callable(client_fn):
+            raise ProviderError(
+                message=f"{self.provider!r} client does not support get_clock().",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        typed_client_fn = cast(
+            Callable[[], Awaitable[dict[str, Any]]],
+            client_fn,
+        )
+
+        raw = await typed_client_fn()
         return self.clock_mapper(raw)
 
     async def list_assets(
@@ -218,7 +263,6 @@ class TradingService(Sequence[Any]):
             )
 
         if not order_id:
-            # This is precisely the error that bit you before; now it's structured.
             raise ValidationError(
                 message="order_id is required for get_order().",
                 domain="trading",
@@ -276,6 +320,27 @@ class TradingService(Sequence[Any]):
             cashflow_types=cashflow_types,
         )
         return self.portfolio_history_mapper(raw)
+
+    async def list_portfolios(
+        self,
+        *,
+        portfolio_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        client_fn = getattr(self.client, "list_portfolios", None)
+        if client_fn is None or not callable(client_fn):
+            raise ProviderError(
+                message=f"{self.provider!r} client does not support list_portfolios().",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        typed_client_fn = cast(
+            Callable[..., Awaitable[list[dict[str, Any]]]],
+            client_fn,
+        )
+
+        return await typed_client_fn(portfolio_type=portfolio_type)
 
     # tools and bundling
     def tool_specs(

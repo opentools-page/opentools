@@ -28,8 +28,6 @@ class OpenToolsError(Exception):
 
     status_code: Optional[int] = None
     request_id: Optional[str] = None
-
-    # raw provider payload, extra context, etc.
     details: Any = None
 
     def __str__(self) -> str:

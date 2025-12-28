@@ -27,7 +27,6 @@ async def list_orders(
     if status is not None:
         params["status"] = status
     if limit is not None:
-        # Alpaca max is 500
         params["limit"] = str(min(limit, 500))
     if after is not None:
         params["after"] = after

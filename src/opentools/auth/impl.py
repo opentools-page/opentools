@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping
 
+from opentools.core.errors import AuthError
+
 from .coinbase_jwt import build_coinbase_jwt
 
 
@@ -68,12 +70,28 @@ class CoinbaseAuth:
         if method is None or path is None:
             raise ValueError("CoinbaseAuth.headers requires method and path")
 
-        token = build_coinbase_jwt(
-            key_name=self.api_key,
-            key_secret=self.api_secret,
-            method=method,
-            host=self.host,
-            path=path,
-            expires_in=self.expires_in,
-        )
+        try:
+            token = build_coinbase_jwt(
+                key_name=self.api_key,
+                key_secret=self.api_secret,
+                method=method,
+                host=self.host,
+                path=path,
+                expires_in=self.expires_in,
+            )
+
+        except ValueError as e:
+            raise AuthError(
+                message=(
+                    "Invalid Coinbase API secret: expected a PEM-encoded private key "
+                    "(the multi-line block starting with '-----BEGIN PRIVATE KEY-----'). "
+                    "You may have pasted the key name, a different provider's key, or "
+                    "a truncated secret."
+                ),
+                domain="trading",
+                provider="coinbase",
+                status_code=None,
+                details=str(e),
+            ) from e
+
         return {"Authorization": f"Bearer {token}"}

@@ -39,7 +39,6 @@ def raise_for_status(
             details=text,
         )
 
-    # Coinbase tends to use 400 for bad params, but keep 422 too
     if status_code in (400, 422):
         raise ValidationError(
             message="Invalid parameters for provider",

@@ -20,7 +20,6 @@ class TradingProviderClient(Protocol):
     # positions
     async def list_positions(self) -> list[dict]: ...
     async def get_position(self, symbol_or_asset_id: str) -> dict: ...
-    async def get_clock(self) -> dict: ...
 
     # assets
     async def list_assets(
@@ -70,3 +69,13 @@ class TradingProviderClient(Protocol):
         pnl_reset: str | None = None,
         cashflow_types: str | None = None,
     ) -> dict: ...
+
+    # # portfolios (coinbase only)
+    # async def list_portfolios(
+    #     self,
+    #     *,
+    #     portfolio_type: str | None = None,
+    # ) -> list[dict]: ...
+
+    # # clock
+    # async def get_clock(self) -> dict: ...

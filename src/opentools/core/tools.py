@@ -96,7 +96,7 @@ def tool_handler(fn: Callable[..., Awaitable[Any]]) -> ToolHandler:
     Wrap a domain method so it always returns:
 
       {"ok": True, "data": ...}
-      {"ok": False, "error": ...}   # when an OpenToolsError is raised
+      {"ok": False, "error": ...}
 
     This keeps tool outputs consistent for agents.
     """
