@@ -9,6 +9,25 @@ from pydantic import BaseModel, ConfigDict, Field
 class TradingModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    def canonical_view(
+        self,
+        *,
+        include_provider: bool = True,
+        include_provider_fields: bool = True,
+    ) -> dict[str, Any]:
+        exclude: set[str] = set()
+
+        cls = self.__class__
+        fields = getattr(cls, "model_fields", {})
+
+        if not include_provider and "provider" in fields:
+            exclude.add("provider")
+
+        if not include_provider_fields and "provider_fields" in fields:
+            exclude.add("provider_fields")
+
+        return self.model_dump(exclude=exclude)
+
 
 # account
 class Account(TradingModel):
@@ -93,7 +112,7 @@ class Order(TradingModel):
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
 
-# portfolio
+# portfolio history
 class PortfolioHistory(TradingModel):
     provider: str | None = None
     timeframe: str | None = None
@@ -101,7 +120,7 @@ class PortfolioHistory(TradingModel):
     base_value: float | None = None
     base_value_asof: datetime | None = None
 
-    points: List[PortfolioHistoryPoint] = Field(default_factory=list)
+    points: List["PortfolioHistoryPoint"] = Field(default_factory=list)
     provider_fields: Dict[str, Any] = Field(default_factory=dict)
 
 

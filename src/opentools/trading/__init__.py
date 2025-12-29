@@ -78,6 +78,7 @@ def alpaca(
     framework: FrameworkName | None = None,
     include: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
+    minimal: bool = False,
 ) -> TradingService:
     base_url = ALPACA_PAPER_URL if paper else ALPACA_LIVE_URL
     env = "paper" if paper else "live"
@@ -111,6 +112,7 @@ def alpaca(
         framework=framework,
         include=inc_tools,
         exclude=exc_tools,
+        minimal=minimal,
     )
 
 
@@ -231,6 +233,7 @@ def coinbase(
     framework: FrameworkName | None = None,
     include: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
+    minimal: bool = False,
 ) -> TradingService:
     base_url = COINBASE_SANDBOX_URL if paper else COINBASE_LIVE_URL
     parsed = urlparse(base_url)
@@ -268,4 +271,5 @@ def coinbase(
         framework=framework,
         include=inc_tools,
         exclude=exc_tools,
+        minimal=minimal,
     )

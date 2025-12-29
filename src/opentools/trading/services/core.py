@@ -36,6 +36,9 @@ class TradingService(Sequence[Any]):
     include: tuple[str, ...] = field(default_factory=tuple)
     exclude: tuple[str, ...] = field(default_factory=tuple)
 
+    # hiding or not hiding specific provider fields
+    minimal: bool = False
+
     _bundle_cache: dict[
         tuple[ModelName, tuple[str, ...], tuple[str, ...]], ToolBundle
     ] = field(default_factory=dict, init=False, repr=False)

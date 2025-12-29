@@ -30,9 +30,7 @@ async def main() -> None:
         ),
     )
 
-    user_prompt = (
-        "list all tools and then obtain all my portfolios with coinbase please"
-    )
+    user_prompt = "use one of the tools and return the pyndatic that you receive rihgt only the pydantic you receive pick coinbase_get_account or something similar"
 
     result = await agent.run(user_prompt)
     print(result)
