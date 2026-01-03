@@ -17,20 +17,19 @@ async def main() -> None:
         api_secret=os.environ["COINBASE_SECRET"],
         model="gemini",
         framework="pydantic_ai",
-        paper=False,
+        minimal=True,
     )
 
     agent = Agent(
         "google-gla:gemini-2.5-flash",
         tools=tools,
         system_prompt=(
-            "You are a trading assistant with access to Coinbase tools. "
-            "Prefer calling tools when asked about account, positions, "
-            "assets, or orders."
+            """You are a trading assistant that has access to coinbase tools. Be sure to provide
+            when required"""
         ),
     )
 
-    user_prompt = "list all tools"
+    user_prompt = "list 5 diferent assets on coinbase for me please - give me raw ouptput you receive"
 
     result = await agent.run(user_prompt)
     print(result)

@@ -15,7 +15,7 @@ from ...schemas import (
     Position,
 )
 
-_OPENTOOLS_INTERNAL_PREFIXES = "_opentools_"
+_OPENTOOLS_INTERNAL_PREFIXES: tuple[str, ...] = ("_opentools_",)
 
 
 def _parse_dt(s: str | None) -> datetime | None:
@@ -30,7 +30,7 @@ def _to_str(v: Any) -> str | None:
     return str(v)
 
 
-def _normalise_side(side: str | None) -> Literal["buy", "sell"] | None:
+def _normalize_side(side: str | None) -> Literal["buy", "sell"] | None:
     if not side:
         return None
     s = side.lower()
@@ -44,10 +44,31 @@ def _extras(raw: dict[str, Any], used_keys: set[str]) -> dict[str, Any]:
     for k, v in raw.items():
         if k in used_keys:
             continue
-        if any(k.startswith(p) for p in _OPENTOOLS_INTERNAL_PREFIXES):
+        if isinstance(k, str) and k.startswith(_OPENTOOLS_INTERNAL_PREFIXES):
             continue
         out[k] = v
     return out
+
+
+def _money(x: Any) -> MoneyAmount | None:
+    if not isinstance(x, dict):
+        return None
+    return MoneyAmount(
+        value=_to_str(x.get("value")),
+        currency=_to_str(x.get("currency")),
+    )
+
+
+def _nested_money_value(x: Any) -> str | None:
+    if not isinstance(x, dict):
+        return None
+    native = x.get("userNativeCurrency")
+    raw = x.get("rawCurrency")
+    if isinstance(native, dict) and native.get("value") is not None:
+        return _to_str(native.get("value"))
+    if isinstance(raw, dict) and raw.get("value") is not None:
+        return _to_str(raw.get("value"))
+    return None
 
 
 # accounts
@@ -58,9 +79,6 @@ def account_from_coinbase(data: dict[str, Any]) -> Account:
 
     used = {"uuid", "active", "currency", "available_balance", "created_at"}
     provider_fields = _extras(data, used)
-
-    if data.get("_opentools_primary_fallback"):
-        provider_fields["_opentools_primary_fallback"] = True
 
     return Account(
         provider="coinbase",
@@ -83,7 +101,7 @@ def order_from_coinbase(data: dict[str, Any]) -> Order | None:
         return None
 
     product_id = data.get("product_id")
-    side = _normalise_side(data.get("side"))
+    side = _normalize_side(data.get("side"))
     status = data.get("status")
 
     created_dt = _parse_dt(data.get("created_time") or data.get("created_at"))
@@ -146,9 +164,8 @@ def asset_from_coinbase(data: dict[str, Any]) -> Asset | None:
         data.get("display_name_overwrite") or data.get("display_name") or None
     )
     if not display_name and (base_name or quote_name):
-        parts = [p for p in [base_name, quote_name] if p]
-        if parts:
-            display_name = " / ".join(parts)
+        parts = [p for p in (base_name, quote_name) if p]
+        display_name = " / ".join(parts) if parts else None
 
     product_type = data.get("product_type")
     if product_type == "SPOT":
@@ -227,9 +244,10 @@ def portfolio_breakdown_from_coinbase(bd: dict[str, Any]) -> PortfolioBreakdown:
             "total_futures_balance",
             "total_cash_equivalent_balance",
             "total_crypto_balance",
-            "futures_unrealised_pnl",
-            "perp_unrealised_pnl",
+            "futures_unrealized_pnl",
+            "perp_unrealized_pnl",
         }
+
         balances = PortfolioBalances(
             total_balance=_money(balances_raw.get("total_balance")),
             total_futures_balance=_money(balances_raw.get("total_futures_balance")),
@@ -237,8 +255,8 @@ def portfolio_breakdown_from_coinbase(bd: dict[str, Any]) -> PortfolioBreakdown:
                 balances_raw.get("total_cash_equivalent_balance")
             ),
             total_crypto_balance=_money(balances_raw.get("total_crypto_balance")),
-            futures_unrealised_pnl=_money(balances_raw.get("futures_unrealised_pnl")),
-            perp_unrealised_pnl=_money(balances_raw.get("perp_unrealised_pnl")),
+            futures_unrealized_pnl=_money(balances_raw.get("futures_unrealized_pnl")),
+            perp_unrealized_pnl=_money(balances_raw.get("perp_unrealized_pnl")),
             provider_fields=_extras(balances_raw, used_bal),
         )
 
@@ -272,15 +290,6 @@ def portfolio_breakdown_from_coinbase(bd: dict[str, Any]) -> PortfolioBreakdown:
     )
 
 
-def _money(x: Any) -> MoneyAmount | None:
-    if not isinstance(x, dict):
-        return None
-    return MoneyAmount(
-        value=_to_str(x.get("value")),
-        currency=_to_str(x.get("currency")),
-    )
-
-
 # positions
 def position_from_coinbase(data: dict[str, Any]) -> Position | None:
     kind = data.get("_opentools_position_kind")
@@ -311,7 +320,7 @@ def spot_position_from_coinbase(data: dict[str, Any]) -> Position | None:
     avg_entry_val = avg_entry.get("value")
 
     qty = data.get("total_balance_crypto")
-    unrealised_pl = data.get("unrealised_pnl")
+    unrealized_pl = data.get("unrealized_pnl")
 
     used = {
         "asset",
@@ -319,7 +328,7 @@ def spot_position_from_coinbase(data: dict[str, Any]) -> Position | None:
         "average_entry_price",
         "total_balance_crypto",
         "total_balance_fiat",
-        "unrealised_pnl",
+        "unrealized_pnl",
     }
     provider_fields = _extras(data, used)
 
@@ -328,11 +337,11 @@ def spot_position_from_coinbase(data: dict[str, Any]) -> Position | None:
         symbol=str(asset),
         qty=_to_str(qty),
         avg_entry_price=_to_str(avg_entry_val),
-        current_price=None,  # not provided
+        current_price=None,
         market_value=_to_str(data.get("total_balance_fiat")),
-        unrealised_pl=_to_str(unrealised_pl),
-        unrealised_plpc=None,
-        side="long",  # spot holdings are long essentially
+        unrealized_pl=_to_str(unrealized_pl),
+        unrealized_plpc=None,
+        side="long",
         provider_fields=provider_fields,
     )
 
@@ -351,7 +360,7 @@ def perp_position_from_coinbase(data: dict[str, Any]) -> Position | None:
 
     qty = data.get("net_size")
     mark_price = _nested_money_value(data.get("mark_price"))
-    unrealised_pl = _nested_money_value(data.get("unrealised_pnl"))
+    unrealized_pl = _nested_money_value(data.get("unrealized_pnl"))
     avg_entry_price = _nested_money_value(data.get("vwap"))
     notional = _nested_money_value(data.get("position_notional"))
 
@@ -362,7 +371,7 @@ def perp_position_from_coinbase(data: dict[str, Any]) -> Position | None:
         "position_side",
         "net_size",
         "mark_price",
-        "unrealised_pnl",
+        "unrealized_pnl",
         "vwap",
         "position_notional",
     }
@@ -375,8 +384,8 @@ def perp_position_from_coinbase(data: dict[str, Any]) -> Position | None:
         avg_entry_price=_to_str(avg_entry_price),
         current_price=_to_str(mark_price),
         market_value=_to_str(notional),
-        unrealised_pl=_to_str(unrealised_pl),
-        unrealised_plpc=None,
+        unrealized_pl=_to_str(unrealized_pl),
+        unrealized_plpc=None,
         side=side,
         provider_fields=provider_fields,
     )
@@ -407,7 +416,7 @@ def futures_position_from_coinbase(data: dict[str, Any]) -> Position | None:
         "avg_entry_price",
         "current_price",
         "notional_value",
-        "unrealised_pnl",
+        "unrealized_pnl",
     }
     provider_fields = _extras(data, used)
 
@@ -418,31 +427,16 @@ def futures_position_from_coinbase(data: dict[str, Any]) -> Position | None:
         avg_entry_price=_to_str(data.get("avg_entry_price")),
         current_price=_to_str(data.get("current_price")),
         market_value=_to_str(data.get("notional_value")),
-        unrealised_pl=_to_str(data.get("unrealised_pnl")),
-        unrealised_plpc=None,
+        unrealized_pl=_to_str(data.get("unrealized_pnl")),
+        unrealized_plpc=None,
         side=side,
         provider_fields=provider_fields,
     )
 
 
-def _nested_money_value(x: Any) -> str | None:
-    if not isinstance(x, dict):
-        return None
-    native = x.get("userNativeCurrency")
-    raw = x.get("rawCurrency")
-    if isinstance(native, dict) and native.get("value") is not None:
-        return _to_str(native.get("value"))
-    if isinstance(raw, dict) and raw.get("value") is not None:
-        return _to_str(raw.get("value"))
-    return None
-
-
 # stub
 def clock_from_coinbase(data: dict[str, Any]) -> Clock:
-    # Clock is not found in Coinbase
-    used: set[str] = set()
-    provider_fields = _extras(data, used)
-
+    provider_fields = _extras(data, used_keys=set())
     return Clock(
         provider="coinbase",
         timestamp=None,

@@ -11,7 +11,6 @@ class TradingModel(BaseModel):
 
     @model_validator(mode="after")
     def _normalise_datetimes_to_utc(self) -> "TradingModel":
-        # normalise datetime fields
         fields = getattr(self.__class__, "model_fields", {}) or {}
 
         for name in fields:
@@ -31,18 +30,49 @@ class TradingModel(BaseModel):
         include_provider: bool = True,
         include_provider_fields: bool = True,
     ) -> dict[str, Any]:
-        exclude: set[str] = set()
+        INTERNAL_PREFIXES: tuple[str, ...] = ("_opentools_",)
 
-        cls = self.__class__
-        fields = getattr(cls, "model_fields", {})
+        seen_ids: set[int] = set()
 
-        if not include_provider and "provider" in fields:
-            exclude.add("provider")
+        def walk(value: Any) -> Any:
+            if isinstance(value, TradingModel):
+                vid = id(value)
+                if vid in seen_ids:
+                    return "<recursion>"
+                seen_ids.add(vid)
 
-        if not include_provider_fields and "provider_fields" in fields:
-            exclude.add("provider_fields")
+                out_obj: dict[str, Any] = {}
+                for field_name in type(value).model_fields:
+                    if not include_provider and field_name == "provider":
+                        continue
+                    if not include_provider_fields and field_name == "provider_fields":
+                        continue
+                    out_obj[field_name] = walk(getattr(value, field_name))
 
-        return self.model_dump(exclude=exclude)
+                seen_ids.remove(vid)
+                return out_obj
+
+            if isinstance(value, BaseModel):
+                return value.model_dump()
+
+            if isinstance(value, dict):
+                out_map: dict[str, Any] = {}
+                for k, v in value.items():
+                    if isinstance(k, str) and k.startswith(INTERNAL_PREFIXES):
+                        continue
+                    if (not include_provider and k == "provider") or (
+                        not include_provider_fields and k == "provider_fields"
+                    ):
+                        continue
+                    out_map[k] = walk(v)
+                return out_map
+
+            if isinstance(value, (list, tuple)):
+                return [walk(v) for v in value]
+
+            return value
+
+        return walk(self)
 
 
 # account
@@ -67,8 +97,11 @@ class Position(TradingModel):
     avg_entry_price: str | None = None
     current_price: str | None = None
     market_value: str | None = None
-    unrealised_pl: str | None = None
-    unrealised_plpc: str | None = None
+
+    # American spelling is canonical
+    unrealized_pl: str | None = None
+    unrealized_plpc: str | None = None
+
     side: Literal["long", "short"] | None = None
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
@@ -166,8 +199,10 @@ class PortfolioBalances(TradingModel):
     total_futures_balance: MoneyAmount | None = None
     total_cash_equivalent_balance: MoneyAmount | None = None
     total_crypto_balance: MoneyAmount | None = None
-    futures_unrealised_pnl: MoneyAmount | None = None
-    perp_unrealised_pnl: MoneyAmount | None = None
+
+    futures_unrealized_pnl: MoneyAmount | None = None
+    perp_unrealized_pnl: MoneyAmount | None = None
+
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
 

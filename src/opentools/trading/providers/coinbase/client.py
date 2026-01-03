@@ -96,12 +96,33 @@ class CoinbaseClient:
         )
 
     async def get_position(self, symbol_or_asset_id: str) -> dict[str, Any]:
-        """
-        Not wired yet. Could be implemented later by:
-        - calling list_positions(), then
-        - filtering by symbol/product_id.
-        """
-        raise NotImplementedError("get_position is not implemented for Coinbase yet")
+        def _norm(x: Any) -> str:
+            s = str(x or "").strip().upper()
+            return s.replace("/", "-")
+
+        target = _norm(symbol_or_asset_id)
+        if not target:
+            return {}
+
+        positions = await self.list_positions()
+
+        for p in positions:
+            if not isinstance(p, dict):
+                continue
+
+            candidates = [
+                p.get("product_id"),
+                p.get("symbol"),
+                p.get("asset"),
+                p.get("instrument_id"),
+                p.get("product_uuid"),
+            ]
+
+            for c in candidates:
+                if c and _norm(c) == target:
+                    return dict(p)
+
+        return {}
 
     # orders
     async def list_orders(

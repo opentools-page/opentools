@@ -1816,6 +1816,7 @@ dependencies = [
     { name = "pydantic-ai" },
     { name = "pydantic-ai-slim", extra = ["google"] },
     { name = "pynacl" },
+    { name = "pytest" },
     { name = "python-dotenv" },
 ]
 
@@ -1841,6 +1842,7 @@ requires-dist = [
     { name = "pydantic-ai", specifier = ">=1.38.0" },
     { name = "pydantic-ai-slim", extras = ["google"], specifier = ">=1.38.0" },
     { name = "pynacl", specifier = ">=1.6.1" },
+    { name = "pytest", specifier = ">=9.0.2" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
 ]
 
