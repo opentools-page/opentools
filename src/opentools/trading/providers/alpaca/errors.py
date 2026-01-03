@@ -21,7 +21,7 @@ def raise_for_status(
 ):
     if status_code in (401, 403):
         raise AuthError(
-            message="Unauthorized (check API keys / permissions)",
+            message="Unauthorised (check API keys / permissions)",
             domain=domain,
             provider=provider,
             status_code=status_code,

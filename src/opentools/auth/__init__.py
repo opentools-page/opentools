@@ -6,7 +6,7 @@ from .impl import BearerTokenAuth, HeaderAuth
 from .interface import Auth
 
 
-def normalize_auth(auth: Any) -> Auth:
+def normalise_auth(auth: Any) -> Auth:
     if isinstance(auth, str):
         return BearerTokenAuth(auth)
 

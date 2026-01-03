@@ -13,38 +13,11 @@ from opentools.trading.schemas import (
 )
 from opentools.trading.services.core import TradingService
 
-
-def minimal(obj: Any, *, minimal: bool) -> Any:
-    include_provider = not minimal
-    include_provider_fields = not minimal
-
-    if isinstance(obj, list):
-        out: list[Any] = []
-        for x in obj:
-            if hasattr(x, "canonical_view"):
-                out.append(
-                    x.canonical_view(
-                        include_provider=include_provider,
-                        include_provider_fields=include_provider_fields,
-                    )
-                )
-            else:
-                out.append(x)
-        return out
-
-    if hasattr(obj, "canonical_view"):
-        return obj.canonical_view(
-            include_provider=include_provider,
-            include_provider_fields=include_provider_fields,
-        )
-
-    return obj
+from ...utils import minimal
 
 
 def alpaca_tools(service: TradingService) -> list[ToolSpec]:
     prefix = "alpaca"
-
-    # ---------- tool handlers ----------
 
     async def _get_account_tool() -> Dict[str, Any]:
         acct: Account = await service.get_account()

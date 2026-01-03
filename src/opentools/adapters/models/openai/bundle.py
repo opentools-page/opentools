@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, List
 
 from openai.types.chat import ChatCompletionToolParam
-from opentools.adapters.utils import sanitize_tool_name, unique_name
+from opentools.adapters.utils import sanitise_tool_name, unique_name
 from opentools.core.tools import ToolBundle, ToolSpec
 
 
@@ -13,7 +13,7 @@ def to_openai_bundle(tool_specs: List[ToolSpec]) -> ToolBundle:
     used: set[str] = set()
 
     for spec in tool_specs:
-        base = sanitize_tool_name(spec.name)
+        base = sanitise_tool_name(spec.name)
         safe = unique_name(base, used)
 
         dispatch[safe] = spec

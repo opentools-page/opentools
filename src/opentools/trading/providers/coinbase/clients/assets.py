@@ -25,10 +25,10 @@ async def list_assets(
         params["cursor"] = cursor
 
     if asset_class is not None:
-        normalized = asset_class.lower()
-        if normalized in ("spot", "crypto"):
+        normalised = asset_class.lower()
+        if normalised in ("spot", "crypto"):
             params["product_type"] = "SPOT"
-        elif normalized in ("future", "futures"):
+        elif normalised in ("future", "futures"):
             params["product_type"] = "FUTURE"
         else:
             params["product_type"] = asset_class

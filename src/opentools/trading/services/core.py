@@ -9,7 +9,16 @@ from opentools.core.errors import ProviderError, ValidationError
 from opentools.core.tools import ToolBundle, ToolInput, ToolSpec
 from opentools.core.types import FrameworkName, ModelName
 
-from ..schemas import Account, Asset, Clock, Order, PortfolioHistory, Position
+from ..schemas import (
+    Account,
+    Asset,
+    Clock,
+    Order,
+    Portfolio,
+    PortfolioBreakdown,
+    PortfolioHistory,
+    Position,
+)
 from .provider import TradingProviderClient
 
 if TYPE_CHECKING:
@@ -23,15 +32,19 @@ class TradingService(Sequence[Any]):
     """
 
     client: TradingProviderClient
+    model: ModelName
+
     account_mapper: Callable[[dict], Account]
     position_mapper: Callable[[dict], Position | None]
     clock_mapper: Callable[[dict], Clock]
-    model: ModelName
-
-    framework: FrameworkName | None = None
     asset_mapper: Callable[[dict], Asset | None] | None = None
     order_mapper: Callable[[dict], Order | None] | None = None
+
     portfolio_history_mapper: Callable[[dict], PortfolioHistory] | None = None
+    portfolio_mapper: Callable[[dict], Portfolio | None] | None = None
+    portfolio_breakdown_mapper: Callable[[dict], PortfolioBreakdown] | None = None
+
+    framework: FrameworkName | None = None
 
     include: tuple[str, ...] = field(default_factory=tuple)
     exclude: tuple[str, ...] = field(default_factory=tuple)
@@ -68,10 +81,7 @@ class TradingService(Sequence[Any]):
                 status_code=None,
             )
 
-        typed_client_fn = cast(
-            Callable[..., Awaitable[Any]],
-            client_fn,
-        )
+        typed_client_fn = cast(Callable[..., Awaitable[Any]], client_fn)
 
         raw = await typed_client_fn(
             limit=limit,
@@ -99,13 +109,38 @@ class TradingService(Sequence[Any]):
 
         out: list[Account] = []
         for item in accounts_raw:
-            acc = self.account_mapper(item)
-            out.append(acc)
-
+            out.append(self.account_mapper(item))
         return out
 
-    async def list_positions(self) -> list[Position]:
-        raw_list = await self.client.list_positions()
+    # positions
+    async def list_positions(
+        self,
+        *,
+        portfolio_type: str | None = None,
+        currency: str | None = None,
+    ) -> list[Position]:
+        client_fn = getattr(self.client, "list_positions", None)
+        if client_fn is None or not callable(client_fn):
+            raise ProviderError(
+                message=f"{self.provider!r} client does not support list_positions().",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        typed_client_fn = cast(
+            Callable[..., Awaitable[list[dict[str, Any]]]], client_fn
+        )
+
+        # Coinbase supports these params; Alpaca doesn't.
+        if self.provider == "coinbase":
+            raw_list = await typed_client_fn(
+                portfolio_type=portfolio_type,
+                currency=currency,
+            )
+        else:
+            raw_list = await typed_client_fn()
+
         out: list[Position] = []
         for item in raw_list:
             p = self.position_mapper(item)
@@ -117,6 +152,7 @@ class TradingService(Sequence[Any]):
         raw = await self.client.get_position(symbol_or_asset_id)
         return self.position_mapper(raw)
 
+    # clock
     async def get_clock(self) -> Clock:
         if self.provider == "coinbase":
             raise ProviderError(
@@ -139,14 +175,11 @@ class TradingService(Sequence[Any]):
                 status_code=None,
             )
 
-        typed_client_fn = cast(
-            Callable[[], Awaitable[dict[str, Any]]],
-            client_fn,
-        )
-
+        typed_client_fn = cast(Callable[[], Awaitable[dict[str, Any]]], client_fn)
         raw = await typed_client_fn()
         return self.clock_mapper(raw)
 
+    # assets
     async def list_assets(
         self,
         *,
@@ -172,14 +205,12 @@ class TradingService(Sequence[Any]):
 
         out: list[Asset] = []
         max_items = limit or len(raw_list)
-
         for item in raw_list:
             a = self.asset_mapper(item)
             if a is not None:
                 out.append(a)
             if len(out) >= max_items:
                 break
-
         return out
 
     async def get_asset(self, symbol_or_asset_id: str) -> Asset | None:
@@ -193,6 +224,7 @@ class TradingService(Sequence[Any]):
         raw = await self.client.get_asset(symbol_or_asset_id)
         return self.asset_mapper(raw)
 
+    # orders
     async def list_orders(
         self,
         *,
@@ -224,8 +256,7 @@ class TradingService(Sequence[Any]):
             )
 
         typed_client_fn = cast(
-            Callable[..., Awaitable[list[dict[str, Any]]]],
-            client_fn,
+            Callable[..., Awaitable[list[dict[str, Any]]]], client_fn
         )
 
         raw_list = await typed_client_fn(
@@ -287,14 +318,39 @@ class TradingService(Sequence[Any]):
                 provider=self.provider,
             )
 
-        typed_client_fn = cast(
-            Callable[..., Awaitable[dict[str, Any]]],
-            client_fn,
-        )
-
+        typed_client_fn = cast(Callable[..., Awaitable[dict[str, Any]]], client_fn)
         raw = await typed_client_fn(order_id=order_id, nested=nested)
         return self.order_mapper(raw)
 
+    # portfolio breakdown (Coinbase-specific feature)
+    async def get_portfolio_breakdown(
+        self,
+        *,
+        portfolio_uuid: str,
+        currency: str | None = None,
+    ) -> PortfolioBreakdown:
+        if self.portfolio_breakdown_mapper is None:
+            raise ProviderError(
+                message=f"Portfolio breakdown not supported for provider {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        client_fn = getattr(self.client, "get_portfolio_breakdown", None)
+        if client_fn is None or not callable(client_fn):
+            raise ProviderError(
+                message=f"{self.provider!r} client does not support get_portfolio_breakdown().",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        typed = cast(Callable[..., Awaitable[dict[str, Any]]], client_fn)
+        raw = await typed(portfolio_uuid=portfolio_uuid, currency=currency)
+        return self.portfolio_breakdown_mapper(raw)
+
+    # portfolio history
     async def get_portfolio_history(
         self,
         *,
@@ -328,7 +384,15 @@ class TradingService(Sequence[Any]):
         self,
         *,
         portfolio_type: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[Portfolio]:
+        if self.portfolio_mapper is None:
+            raise ProviderError(
+                message=f"Portfolios not supported for provider {self.provider!r}",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
         client_fn = getattr(self.client, "list_portfolios", None)
         if client_fn is None or not callable(client_fn):
             raise ProviderError(
@@ -338,12 +402,32 @@ class TradingService(Sequence[Any]):
                 status_code=None,
             )
 
-        typed_client_fn = cast(
-            Callable[..., Awaitable[list[dict[str, Any]]]],
-            client_fn,
-        )
+        typed = cast(Callable[..., Awaitable[Any]], client_fn)
+        raw = await typed(portfolio_type=portfolio_type)
 
-        return await typed_client_fn(portfolio_type=portfolio_type)
+        items: list[dict[str, Any]] = []
+        if isinstance(raw, list):
+            items = [x for x in raw if isinstance(x, dict)]
+        elif isinstance(raw, dict):
+            maybe = raw.get("portfolios")
+            if isinstance(maybe, list):
+                items = [x for x in maybe if isinstance(x, dict)]
+            else:
+                items = [raw]
+        else:
+            raise ProviderError(
+                message="Unexpected list_portfolios() response shape from provider.",
+                domain="trading",
+                provider=self.provider,
+                status_code=None,
+            )
+
+        out: list[Portfolio] = []
+        for d in items:
+            p = self.portfolio_mapper(d)
+            if p is not None:
+                out.append(p)
+        return out
 
     # tools and bundling
     def tool_specs(

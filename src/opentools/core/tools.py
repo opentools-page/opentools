@@ -31,7 +31,6 @@ class ToolBundle:
     Provider-shaped tools + dispatch table.
 
     - tools: list of provider-specific tool objects (Anthropic/OpenAI/etc)
-    - dispatch: map from sanitized tool name -> ToolSpec
     """
 
     tools: list[Any]
@@ -39,7 +38,7 @@ class ToolBundle:
 
     async def call(self, tool_name: str, tool_input: ToolInput) -> Any:
         """
-        Run a tool by its sanitized name (the one the model sees).
+        Run a tool by its sanitised name (the one the model sees).
         """
         spec = self.dispatch.get(tool_name)
         if spec is None:
@@ -54,13 +53,6 @@ class ToolBundle:
 
 
 def merge_bundles(*bundles: ToolBundle) -> ToolBundle:
-    """
-    Combine multiple ToolBundles into a single one.
-
-    - concatenates provider-ready `tools` lists
-    - merges dispatch maps
-    - raises on name collisions (sanitized names must be unique)
-    """
     tools: list[Any] = []
     dispatch: dict[str, ToolSpec] = {}
 
@@ -92,15 +84,6 @@ def error_payload(e: OpenToolsError) -> dict[str, Any]:
 
 
 def tool_handler(fn: Callable[..., Awaitable[Any]]) -> ToolHandler:
-    """
-    Wrap a domain method so it always returns:
-
-      {"ok": True, "data": ...}
-      {"ok": False, "error": ...}
-
-    This keeps tool outputs consistent for agents.
-    """
-
     async def _wrapped(inp: ToolInput) -> dict[str, Any]:
         try:
             data = await fn(**inp)

@@ -12,27 +12,25 @@ load_dotenv()
 
 
 async def main() -> None:
-    tools = trading.alpaca(
-        api_key=os.environ["ALPACA_KEY"],
-        api_secret=os.environ["ALPACA_SECRET"],
+    tools = trading.coinbase(
+        api_key=os.environ["COINBASE_KEY"],
+        api_secret=os.environ["COINBASE_SECRET"],
         model="gemini",
         framework="pydantic_ai",
-        paper=True,
+        paper=False,
     )
 
     agent = Agent(
         "google-gla:gemini-2.5-flash",
         tools=tools,
         system_prompt=(
-            "You are a trading assistant with access to Alpaca tools. "
+            "You are a trading assistant with access to Coinbase tools. "
             "Prefer calling tools when asked about account, positions, "
             "assets, or orders."
         ),
     )
 
-    user_prompt = (
-        "get my account -- return solely the pydantic object in json you receive"
-    )
+    user_prompt = "list all tools"
 
     result = await agent.run(user_prompt)
     print(result)

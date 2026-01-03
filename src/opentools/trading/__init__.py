@@ -30,6 +30,8 @@ from opentools.trading.providers.coinbase.mappers import (
     asset_from_coinbase,
     clock_from_coinbase,
     order_from_coinbase,
+    portfolio_breakdown_from_coinbase,
+    portfolio_from_coinbase,
     position_from_coinbase,
 )
 from opentools.trading.providers.coinbase.transport import CoinbaseTransport
@@ -38,17 +40,12 @@ from opentools.trading.services import TradingService
 
 # alpaca
 def _resolve_alpaca_auth(
-    *,
-    auth: Any | None,
-    api_key: str | None,
-    api_secret: str | None,
+    *, auth: Any | None, api_key: str | None, api_secret: str | None
 ) -> AlpacaAuth:
     if api_key and api_secret:
         return AlpacaAuth(key_id=api_key, secret_key=api_secret)
-
     if isinstance(auth, AlpacaAuth):
         return auth
-
     if auth is not None:
         raise AuthError(
             message=(
@@ -59,7 +56,6 @@ def _resolve_alpaca_auth(
             provider="alpaca",
             details=repr(auth),
         )
-
     raise AuthError(
         message="Missing Alpaca auth. Provide api_key+api_secret.",
         domain="trading",
@@ -84,9 +80,7 @@ def alpaca(
     env = "paper" if paper else "live"
 
     alpaca_auth = _resolve_alpaca_auth(
-        auth=auth,
-        api_key=api_key,
-        api_secret=api_secret,
+        auth=auth, api_key=api_key, api_secret=api_secret
     )
 
     transport = AlpacaTransport(
@@ -159,11 +153,7 @@ def _resolve_coinbase_auth(
                 },
             )
 
-        return CoinbaseAuth(
-            api_key=api_key,
-            api_secret=api_secret,
-            host=host,
-        )
+        return CoinbaseAuth(api_key=api_key, api_secret=api_secret, host=host)
 
     if explicit_bearer:
         return BearerTokenAuth(token=bearer_token)
@@ -175,14 +165,12 @@ def _resolve_coinbase_auth(
                 api_secret=str(auth["private_key"]),
                 host=host,
             )
-
         if "api_key" in auth and "api_secret" in auth:
             return CoinbaseAuth(
                 api_key=str(auth["api_key"]),
                 api_secret=str(auth["api_secret"]),
                 host=host,
             )
-
         if "Authorization" in auth:
             return HeaderAuth(headers_dict=dict(auth))
 
@@ -236,8 +224,8 @@ def coinbase(
     minimal: bool = False,
 ) -> TradingService:
     base_url = COINBASE_SANDBOX_URL if paper else COINBASE_LIVE_URL
-    parsed = urlparse(base_url)
-    host = parsed.netloc
+    host = urlparse(base_url).netloc
+    env = "paper" if paper else "live"
 
     cb_auth = _resolve_coinbase_auth(
         auth=auth,
@@ -246,8 +234,6 @@ def coinbase(
         bearer_token=bearer_token,
         host=host,
     )
-
-    env = "paper" if paper else "live"
 
     transport = CoinbaseTransport(
         auth=cb_auth,
@@ -267,6 +253,8 @@ def coinbase(
         clock_mapper=clock_from_coinbase,
         asset_mapper=asset_from_coinbase,
         order_mapper=order_from_coinbase,
+        portfolio_mapper=portfolio_from_coinbase,
+        portfolio_breakdown_mapper=portfolio_breakdown_from_coinbase,
         model=model,
         framework=framework,
         include=inc_tools,

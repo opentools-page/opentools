@@ -10,7 +10,7 @@ class ToolRunner(Protocol):
     Minimal surface needed by chat adapters:
 
     - .tools: provider-shaped tools list (what goes into tools=)
-    - .call_tool(name, input): execute a tool by sanitized name
+    - .call_tool(name, input): execute a tool by sanitised name
     """
 
     @property

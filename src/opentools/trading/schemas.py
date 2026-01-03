@@ -1,13 +1,29 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class TradingModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def _normalise_datetimes_to_utc(self) -> "TradingModel":
+        # normalise datetime fields
+        fields = getattr(self.__class__, "model_fields", {}) or {}
+
+        for name in fields:
+            v = getattr(self, name, None)
+            if isinstance(v, datetime):
+                if v.tzinfo is None:
+                    v = v.replace(tzinfo=timezone.utc)
+                else:
+                    v = v.astimezone(timezone.utc)
+                setattr(self, name, v)
+
+        return self
 
     def canonical_view(
         self,
@@ -51,8 +67,8 @@ class Position(TradingModel):
     avg_entry_price: str | None = None
     current_price: str | None = None
     market_value: str | None = None
-    unrealized_pl: str | None = None
-    unrealized_plpc: str | None = None
+    unrealised_pl: str | None = None
+    unrealised_plpc: str | None = None
     side: Literal["long", "short"] | None = None
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
@@ -112,7 +128,7 @@ class Order(TradingModel):
     provider_fields: dict[str, Any] = Field(default_factory=dict)
 
 
-# portfolio history
+# portfolio
 class PortfolioHistory(TradingModel):
     provider: str | None = None
     timeframe: str | None = None
@@ -137,4 +153,31 @@ class Portfolio(TradingModel):
     name: str | None = None
     type: str | None = None
     deleted: bool | None = None
+    provider_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class MoneyAmount(TradingModel):
+    value: str | None = None
+    currency: str | None = None
+
+
+class PortfolioBalances(TradingModel):
+    total_balance: MoneyAmount | None = None
+    total_futures_balance: MoneyAmount | None = None
+    total_cash_equivalent_balance: MoneyAmount | None = None
+    total_crypto_balance: MoneyAmount | None = None
+    futures_unrealised_pnl: MoneyAmount | None = None
+    perp_unrealised_pnl: MoneyAmount | None = None
+    provider_fields: dict[str, Any] = Field(default_factory=dict)
+
+
+class PortfolioBreakdown(TradingModel):
+    provider: str | None = None
+    portfolio: Portfolio | None = None
+    balances: PortfolioBalances | None = None
+
+    spot_positions: list[Position] = Field(default_factory=list)
+    perp_positions: list[Position] = Field(default_factory=list)
+    futures_positions: list[Position] = Field(default_factory=list)
+
     provider_fields: dict[str, Any] = Field(default_factory=dict)

@@ -16,26 +16,16 @@ async def _resolve_default_portfolio_uuid(
     *,
     portfolio_type: str | None = None,
 ) -> str | None:
-    """
-    Choose a portfolio UUID to use when listing positions.
-
-    Priority:
-    1. If `portfolio_type` is provided, use that.
-    2. Otherwise, try Coinbase portfolio_type="DEFAULT".
-    3. If that is empty, fall back to "UNDEFINED" (Coinbase's odd default).
-    """
-
     portfolios: list[dict[str, Any]] = []
 
     if portfolio_type:
-        # explicit type requested (DEFAULT / CONSUMER / INTX / UNDEFINED)
+        # explicit type (DEFAULT / CONSUMER / INTX / UNDEFINED)
         resp = await _list_portfolios(
             transport,
             portfolio_type=portfolio_type,
         )
         portfolios = resp.get("portfolios") or []
     else:
-        # implicit: prefer DEFAULT, then UNDEFINED
         for pt in ("DEFAULT", "UNDEFINED"):
             resp = await _list_portfolios(
                 transport,
@@ -45,7 +35,6 @@ async def _resolve_default_portfolio_uuid(
             if portfolios:
                 break
 
-    # Be defensive in case Coinbase does something weird
     if not isinstance(portfolios, list) or not portfolios:
         return None
 
@@ -63,25 +52,6 @@ async def list_positions(
     portfolio_type: str | None = None,
     currency: str | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Derive 'positions' from Coinbase portfolio breakdown.
-
-    Flow:
-    - Resolve a portfolio UUID (using DEFAULT/UNDEFINED logic if needed).
-    - Call GET /api/v3/brokerage/portfolios/{portfolio_uuid}.
-      `_get_portfolio_breakdown` already returns the inner `breakdown` object.
-    - Flatten:
-        * breakdown.spot_positions
-        * breakdown.perp_positions
-        * breakdown.futures_positions
-      into a single list.
-    - Attach `_opentools_position_kind` so the mapper can convert these
-      into canonical `Position` models later.
-
-    Returned value is still "raw-ish" dicts, just like Alpaca's
-    list_positions helpers, but with that extra kind tag.
-    """
-
     portfolio_uuid = await _resolve_default_portfolio_uuid(
         transport,
         portfolio_type=portfolio_type,
@@ -106,13 +76,13 @@ async def list_positions(
         row["_opentools_position_kind"] = "spot"
         positions.append(row)
 
-    # Perpetual futures positions
+    # Perpetual futures
     for item in breakdown.get("perp_positions") or []:
         row = dict(item)
         row["_opentools_position_kind"] = "perp"
         positions.append(row)
 
-    # Dated futures positions
+    # Dated futures
     for item in breakdown.get("futures_positions") or []:
         row = dict(item)
         row["_opentools_position_kind"] = "future"

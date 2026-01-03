@@ -36,9 +36,11 @@ src/opentools/core/tool_runner.py
 src/opentools/core/tools.py
 src/opentools/core/transport.py
 src/opentools/core/types.py
+src/opentools/tests/conftest.py
 src/opentools/trading/__init__.py
 src/opentools/trading/schemas.py
 src/opentools/trading/tools.py
+src/opentools/trading/utils.py
 src/opentools/trading/providers/__init__.py
 src/opentools/trading/providers/alpaca/__init__.py
 src/opentools/trading/providers/alpaca/_endpoints.py
@@ -65,6 +67,8 @@ src/opentools/trading/providers/coinbase/clients/__init__.py
 src/opentools/trading/providers/coinbase/clients/account.py
 src/opentools/trading/providers/coinbase/clients/assets.py
 src/opentools/trading/providers/coinbase/clients/orders.py
+src/opentools/trading/providers/coinbase/clients/portfolio.py
+src/opentools/trading/providers/coinbase/clients/position.py
 src/opentools/trading/services/__init__.py
 src/opentools/trading/services/core.py
 src/opentools/trading/services/multi.py
