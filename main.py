@@ -4,9 +4,10 @@ import asyncio
 import os
 
 from dotenv import load_dotenv
-from pydantic_ai import Agent
+from openai import AsyncOpenAI
 
 from opentools import trading
+from opentools.adapters.models.openai import run_with_tools
 
 load_dotenv()
 
@@ -15,24 +16,28 @@ async def main() -> None:
     tools = trading.coinbase(
         api_key=os.environ["COINBASE_KEY"],
         api_secret=os.environ["COINBASE_SECRET"],
-        model="gemini",
-        framework="pydantic_ai",
+        model="openai",
+        paper=False,
         minimal=True,
     )
 
-    agent = Agent(
-        "google-gla:gemini-2.5-flash",
-        tools=tools,
-        system_prompt=(
-            """You are a trading assistant that has access to coinbase tools. Be sure to provide
-            when required"""
-        ),
+    client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+    prompt = (
+        "Get my portfolios. Pick one example portfolio ID and check positions. "
+        "If there are no positions, say so."
     )
 
-    user_prompt = "list 5 diferent assets on coinbase for me please - give me raw ouptput you receive"
+    text = await run_with_tools(
+        client=client,
+        model="gpt-4.1-mini",
+        service=tools,
+        user_prompt=prompt,
+        max_rounds=8,
+        max_tokens=600,
+    )
 
-    result = await agent.run(user_prompt)
-    print(result)
+    print(text)
 
 
 if __name__ == "__main__":
