@@ -6,5 +6,5 @@ from opentools.adapters.models.openai.bundle import to_openai_bundle
 from opentools.core.tools import ToolBundle, ToolSpec
 
 
-def to_openrouter_bundle(tool_specs: List[ToolSpec]) -> ToolBundle:
+def to_ollama_bundle(tool_specs: List[ToolSpec]) -> ToolBundle:
     return to_openai_bundle(tool_specs)
