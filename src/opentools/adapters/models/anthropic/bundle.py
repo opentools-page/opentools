@@ -19,7 +19,7 @@ def to_anthropic_bundle(tool_specs: List[ToolSpec]) -> ToolBundle:
         dispatch[safe] = spec
         tools.append(
             {
-                "name": safe,  # satisfies Anthropic regex
+                "name": safe,
                 "description": spec.description,
                 "input_schema": spec.input_schema,
             }

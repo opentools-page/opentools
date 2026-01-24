@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, List, cast
+import json
+from typing import Any, List, Tuple, cast
 
 import google.genai as genai
 from google.genai import errors as genai_errors
@@ -14,13 +15,30 @@ from opentools.core.errors import (
     RateLimitError,
     TransientError,
 )
+from opentools.core.tool_policy import raise_if_fatal_tool_error
 from opentools.core.tool_runner import ToolRunner
 
 
+def _tool_validation_error(
+    message: str, *, details: Any | None = None
+) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "ok": False,
+        "error": {"kind": "validation", "message": message},
+    }
+    if details is not None:
+        out["error"]["details"] = details
+    return out
+
+
+def _jsonable(x: Any) -> Any:
+    try:
+        return json.loads(json.dumps(x, default=str))
+    except Exception:
+        return {"_unserializable": True, "repr": repr(x)}
+
+
 def _wrap_gemini_error(exc: genai_errors.APIError) -> OpenToolsError:
-    """
-    Map google-genai APIError -> our OpenTools error types.
-    """
     code = getattr(exc, "code", None)
     message = getattr(exc, "message", str(exc))
 
@@ -28,7 +46,7 @@ def _wrap_gemini_error(exc: genai_errors.APIError) -> OpenToolsError:
         "message": message,
         "domain": "llm",
         "provider": "gemini",
-        "status_code": code,
+        "status_code": code if isinstance(code, int) else None,
         "details": {"raw": str(exc)},
     }
 
@@ -51,8 +69,18 @@ async def run_with_tools(
     user_prompt: str,
     max_rounds: int = 8,
     max_output_tokens: int = 600,
+    fatal_kinds: Tuple[str, ...] | None = None,
 ) -> str:
     aclient = client.aio
+
+    resolved_fatal_kinds: Tuple[str, ...] = (
+        fatal_kinds
+        if fatal_kinds is not None
+        else cast(
+            Tuple[str, ...],
+            getattr(service, "fatal_tool_error_kinds", ("auth", "config")),
+        )
+    )
 
     contents: List[genai_types.Content] = [
         genai_types.Content(
@@ -89,12 +117,12 @@ async def run_with_tools(
         function_calls: list[Any] = list(function_calls_raw or [])
 
         if function_calls:
-            if response.candidates:
-                first_candidate = response.candidates[0]
-                if first_candidate.content is not None:
-                    contents.append(
-                        cast(genai_types.Content, first_candidate.content)  # type: ignore[arg-type]
-                    )
+            candidates = getattr(response, "candidates", None)
+            if isinstance(candidates, list) and len(candidates) > 0:
+                first_candidate = candidates[0]
+                cand_content = getattr(first_candidate, "content", None)
+                if cand_content is not None:
+                    contents.append(cast(genai_types.Content, cand_content))
 
             for fc_any in function_calls:
                 fc = cast(Any, fc_any)
@@ -109,18 +137,26 @@ async def run_with_tools(
                 )
 
                 if isinstance(raw_args_obj, dict):
-                    args: dict[str, Any] = raw_args_obj
+                    args: Any = raw_args_obj
                 else:
                     try:
                         args = dict(raw_args_obj)  # type: ignore[arg-type]
                     except Exception:
                         args = {}
 
-                result = await service.call_tool(name, args)
+                if not isinstance(args, dict):
+                    result = _tool_validation_error(
+                        "Tool arguments must be a JSON object.",
+                        details={"tool": name, "raw_args": repr(raw_args_obj)},
+                    )
+                else:
+                    result = await service.call_tool(name, args)
+
+                raise_if_fatal_tool_error(result, fatal_kinds=resolved_fatal_kinds)
 
                 function_response_part = genai_types.Part.from_function_response(
                     name=name,
-                    response={"result": result},
+                    response={"result": _jsonable(result)},
                 )
 
                 contents.append(
@@ -132,7 +168,7 @@ async def run_with_tools(
 
             continue
 
-        text = response.text or ""
+        text = getattr(response, "text", None) or ""
         if text:
             final_chunks.append(text)
         break

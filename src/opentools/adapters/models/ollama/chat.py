@@ -1,15 +1,42 @@
 from __future__ import annotations
 
 import json
-from typing import Any, List
+from typing import Any, Dict, List, Tuple, cast
 
 from ollama import AsyncClient, ResponseError
 from opentools.core.errors import ProviderError, TransientError
+from opentools.core.tool_policy import raise_if_fatal_tool_error
 from opentools.core.tool_runner import ToolRunner
 
 
 def _dump(x: Any) -> str:
     return json.dumps(x, indent=2, default=str)
+
+
+def _tool_validation_error(
+    message: str, *, details: Any | None = None
+) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "ok": False,
+        "error": {"kind": "validation", "message": message},
+    }
+    if details is not None:
+        out["error"]["details"] = details
+    return out
+
+
+def _as_dict(x: Any) -> dict[str, Any] | None:
+    return x if isinstance(x, dict) else None
+
+
+def _get(obj: Any, key: str, default: Any = None) -> Any:
+    """
+    Safely access either dict-like or object-like values.
+    """
+    d = _as_dict(obj)
+    if d is not None:
+        return d.get(key, default)
+    return getattr(obj, key, default)
 
 
 async def run_with_tools(
@@ -19,9 +46,19 @@ async def run_with_tools(
     service: ToolRunner,
     user_prompt: str,
     max_rounds: int = 8,
+    fatal_kinds: Tuple[str, ...] | None = None,  # service policy
 ) -> str:
-    messages: List[Any] = [{"role": "user", "content": user_prompt}]
+    messages: List[Dict[str, Any]] = [{"role": "user", "content": user_prompt}]
     final_chunks: list[str] = []
+
+    resolved_fatal_kinds: Tuple[str, ...] = (
+        fatal_kinds
+        if fatal_kinds is not None
+        else cast(
+            Tuple[str, ...],
+            getattr(service, "fatal_tool_error_kinds", ("auth", "config")),
+        )
+    )
 
     for _ in range(max_rounds):
         try:
@@ -31,34 +68,27 @@ async def run_with_tools(
                 tools=service.tools,
                 stream=False,
             )
-        except ResponseError as exc:
+        except ResponseError as e:
             raise ProviderError(
-                message=str(exc),
+                message=str(e),
                 domain="llm",
                 provider="ollama",
-                status_code=getattr(exc, "status_code", None),
-                details=getattr(exc, "error", None),
+                status_code=getattr(e, "status_code", None),
+                details=getattr(e, "error", None),
             ) from None
-        except (ConnectionError, OSError) as exc:
+        except (ConnectionError, OSError) as e:
             raise TransientError(
-                message=(
-                    "Failed to reach Ollama host. "
-                    "Check that `host` points to an Ollama server "
-                    "and that it is running."
-                ),
+                message="Failed to reach Ollama host. Is the Ollama server running?",
                 domain="llm",
                 provider="ollama",
-                details=str(exc),
+                details=str(e),
             ) from None
-
-        except Exception as exc:
+        except Exception as e:
             raise ProviderError(
-                message=str(exc),
-                domain="llm",
-                provider="ollama",
+                message=str(e), domain="llm", provider="ollama"
             ) from None
 
-        message = getattr(resp, "message", None) or resp.get("message")
+        message = _get(resp, "message")
         if message is None:
             raise ProviderError(
                 message="Ollama chat response missing 'message'",
@@ -67,62 +97,61 @@ async def run_with_tools(
                 details=repr(resp),
             )
 
-        messages.append(message)
+        role = _get(message, "role", "assistant")
+        content = _get(message, "content", "") or ""
+        tool_calls = _get(message, "tool_calls", []) or []
 
-        tool_calls = getattr(message, "tool_calls", None)
-        if tool_calls is None:
-            tool_calls = getattr(message, "tool_calls", None)
-        if tool_calls is None and isinstance(message, dict):
-            tool_calls = message.get("tool_calls")
-
-        tool_calls = tool_calls or []
+        assistant_msg: Dict[str, Any] = {
+            "role": role or "assistant",
+            "content": content,
+        }
+        if tool_calls:
+            assistant_msg["tool_calls"] = tool_calls
+        messages.append(assistant_msg)
 
         if tool_calls:
             for tc in tool_calls:
-                func = getattr(tc, "function", None)
-
-                if func is None and isinstance(tc, dict):
-                    func = tc.get("function")
-
+                func = _get(tc, "function")
                 if func is None:
                     continue
 
-                name = getattr(func, "name", None)
-                if name is None and isinstance(func, dict):
-                    name = func.get("name")
-
+                name = _get(func, "name")
                 if not name:
                     continue
 
-                raw_args = getattr(func, "arguments", None)
-                if raw_args is None and isinstance(func, dict):
-                    raw_args = func.get("arguments")
+                raw_args = _get(func, "arguments")
 
-                if isinstance(raw_args, str):
+                if isinstance(raw_args, dict):
+                    args: Any = raw_args
+                elif isinstance(raw_args, str):
                     try:
                         args = json.loads(raw_args)
-                    except Exception:
-                        args = {}
-                elif isinstance(raw_args, dict):
-                    args = raw_args
+                    except json.JSONDecodeError:
+                        args = _tool_validation_error(
+                            "Invalid JSON in tool arguments.",
+                            details={"tool": name, "raw_args": raw_args},
+                        )
                 else:
                     args = {}
 
-                result = await service.call_tool(name, args)
+                if isinstance(args, dict):
+                    result = await service.call_tool(name, args)
+                else:
+                    result = _tool_validation_error(
+                        "Tool arguments must be a JSON object.",
+                        details={"tool": name, "raw_args": raw_args},
+                    )
 
+                raise_if_fatal_tool_error(result, fatal_kinds=resolved_fatal_kinds)
                 messages.append(
                     {
                         "role": "tool",
-                        "tool_name": name,
+                        "name": name,
                         "content": _dump(result),
                     }
                 )
 
             continue
-
-        content = getattr(message, "content", None)
-        if content is None and isinstance(message, dict):
-            content = message.get("content")
 
         if content:
             final_chunks.append(str(content))

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, cast
 
 from opentools.core.bundles import cached_bundle_for
@@ -52,6 +52,9 @@ class TradingService(Sequence[Any]):
     # hiding or not hiding specific provider fields
     minimal: bool = False
 
+    # tool error handling policy (LLM adapters can read this)
+    fatal_tool_error_kinds: tuple[str, ...] = ("auth", "config")
+
     _bundle_cache: dict[
         tuple[ModelName, tuple[str, ...], tuple[str, ...]], ToolBundle
     ] = field(default_factory=dict, init=False, repr=False)
@@ -64,6 +67,21 @@ class TradingService(Sequence[Any]):
     async def get_account(self, account_uuid: str | None = None) -> Account:
         raw = await self.client.get_account(account_uuid)
         return self.account_mapper(raw)
+
+    def strict(self) -> "TradingService":
+        """
+        Raise immediately on fatal tool errors (auth/config by default).
+        Best for production.
+        """
+        return replace(self, fatal_tool_error_kinds=("auth", "config"))
+
+    def demo(self) -> "TradingService":
+        """
+        Never raise based on tool error kinds.
+        Tool failures are returned to the model as ok:false payloads.
+        Best for demos / prototyping.
+        """
+        return replace(self, fatal_tool_error_kinds=())
 
     async def list_accounts(
         self,
