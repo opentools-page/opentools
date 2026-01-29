@@ -12,9 +12,7 @@ from pydantic import BaseModel
 
 from opentools import trading
 
-# ----------------------------
-# JSON / pretty-print helpers
-# ----------------------------
+# pretty print helpers
 
 
 def _json_default(x: Any) -> Any:
@@ -44,9 +42,7 @@ def _pretty(title: str, obj: Any) -> None:
     )
 
 
-# ----------------------------
-# Dump helpers (NO recursion tricks)
-# ----------------------------
+# dump helpers
 
 
 def _dump_full(obj: Any) -> Any:
@@ -65,23 +61,20 @@ def _dump_minimal(obj: Any) -> Any:
     """
     MINIMAL output: reflect exactly what the models provide for 'minimal'
     today (top-level canonical_view or top-level key pop fallback).
-    IMPORTANT: this is intentionally NOT recursive stripping.
     """
+
     if isinstance(obj, list):
         return [_dump_minimal(x) for x in obj]
 
-    # If your TradingModel provides canonical_view, use it exactly.
     if hasattr(obj, "canonical_view"):
         return obj.canonical_view(include_provider=False, include_provider_fields=False)
 
-    # Fallback for non-TradingModel BaseModel: only pop at top-level.
     if isinstance(obj, BaseModel):
         d = obj.model_dump()
         d.pop("provider", None)
         d.pop("provider_fields", None)
         return d
 
-    # Fallback for dict: only pop at top-level.
     if isinstance(obj, dict):
         d = dict(obj)
         d.pop("provider", None)
@@ -101,9 +94,7 @@ def _pretty_full_and_minimal(title: str, obj: Any) -> None:
     _pretty(f"{title} (DIFF SUMMARY)", _diff_summary(full, minimal))
 
 
-# ----------------------------
-# Diff helpers (readability only)
-# ----------------------------
+# diff helpers for readability
 
 
 def _diff_summary(full: Any, minimal: Any) -> dict[str, Any]:
@@ -138,7 +129,6 @@ def _diff_summary(full: Any, minimal: Any) -> dict[str, Any]:
 
         # Base case: different primitive or type mismatch
         if a != b:
-            # Avoid dumping huge values; just mark that it changed.
             changed.append(path or "<root>")
 
     walk(full, minimal, "")
@@ -149,9 +139,7 @@ def _diff_summary(full: Any, minimal: Any) -> dict[str, Any]:
     }
 
 
-# ----------------------------
-# Main test
-# ----------------------------
+# main testing
 
 
 async def main() -> None:
@@ -183,18 +171,15 @@ async def main() -> None:
 
     _pretty("Provider", {"provider": getattr(service, "provider", None)})
 
-    # 1) Account
     acct = await service.get_account()
     _pretty_full_and_minimal("Canonical account (Account)", acct)
 
     accounts = await service.list_accounts(limit=5)
     _pretty_full_and_minimal("Canonical accounts (Account[])", accounts)
 
-    # 2) Portfolios
     portfolios = await service.list_portfolios()
     _pretty_full_and_minimal("Canonical portfolios (Portfolio[])", portfolios)
 
-    # 3) Portfolio breakdown (pick first portfolio)
     if portfolios:
         pid = getattr(portfolios[0], "id", None)
         if pid:
@@ -203,11 +188,9 @@ async def main() -> None:
                 "Canonical portfolio breakdown (PortfolioBreakdown)", bd
             )
 
-    # 4) Positions
     positions = await service.list_positions()
     _pretty_full_and_minimal("Canonical positions (Position[])", positions)
 
-    # 5) Assets
     assets = await service.list_assets(limit=5, asset_class="crypto")
     _pretty_full_and_minimal("Canonical assets (Asset[])", assets)
 
@@ -217,7 +200,6 @@ async def main() -> None:
             asset = await service.get_asset(str(a_sym))
             _pretty_full_and_minimal("Canonical get_asset(Asset)", asset)
 
-    # 6) Orders
     orders = await service.list_orders(limit=5, status=None)
     _pretty_full_and_minimal("Canonical orders (Order[])", orders)
 
