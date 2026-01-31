@@ -19,15 +19,13 @@ async def main() -> None:
     service = trading.alpaca(
         api_key=os.environ["ALPACA_KEY"],
         api_secret=os.environ["ALPACA_SECRET"],
-        # specify the model, this is required for bundling tools correctly
         model="openai",
-        # specify paper trading account or live trading account
         paper=True,
-        # specify minimal output returned to model (maximum token efficiency)
         minimal=True,
+        include=["get_account"],
     )
 
-    prompt = "Show my account summary and list any open positions."
+    prompt = "show all tools available"
 
     # run_with_tools creates the tool-loop to make your developement-time quicker
     result = await run_with_tools(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, cast
@@ -447,6 +448,55 @@ class TradingService(Sequence[Any]):
                 out.append(p)
         return out
 
+    def _normalize_tool_filter(self, x: Iterable[str] | None) -> set[str]:
+        if x is None:
+            return set()
+        if isinstance(x, str):
+            return {x}
+        return {str(i) for i in x}
+
+    def _canonicalize_tool_name(self, name: str) -> str:
+        provider_prefix = f"{self.provider}_"
+        if name.startswith(provider_prefix):
+            return name
+        if "_" not in name:
+            return provider_prefix + name
+        return name
+
+    def _filter_config_strict(self) -> bool:
+        return "config" in self.fatal_tool_error_kinds
+
+    def _handle_invalid_tool_names(
+        self,
+        *,
+        kind: str,
+        invalid: set[str],
+        available: set[str],
+    ) -> None:
+        if not invalid:
+            return
+
+        msg = (
+            f"Invalid tool name(s) in {kind} for provider={self.provider}: {sorted(invalid)}. "
+            f"Available tools: {sorted(available)}"
+        )
+
+        if self._filter_config_strict():
+            raise ValidationError(
+                message=msg,
+                domain="trading",
+                provider=self.provider,
+                field_errors=[
+                    {
+                        "loc": [kind],
+                        "msg": "invalid tool name(s)",
+                        "type": "value_error.invalid",
+                    }
+                ],
+            )
+
+        warnings.warn(msg, category=UserWarning, stacklevel=3)
+
     # tools and bundling
     def tool_specs(
         self,
@@ -454,8 +504,13 @@ class TradingService(Sequence[Any]):
         include: Iterable[str] | None = None,
         exclude: Iterable[str] | None = None,
     ) -> list[ToolSpec]:
-        effective_include = set(include or self.include)
-        effective_exclude = set(exclude or self.exclude)
+        # normalize (and protect against include="get_account" -> chars)
+        inc = self._normalize_tool_filter(include) or set(self.include)
+        exc = self._normalize_tool_filter(exclude) or set(self.exclude)
+
+        # optional ergonomics: allow bare tool names
+        inc = {self._canonicalize_tool_name(x) for x in inc}
+        exc = {self._canonicalize_tool_name(x) for x in exc}
 
         ts_self = cast("TradingService", self)
 
@@ -474,10 +529,47 @@ class TradingService(Sequence[Any]):
                 provider=self.provider,
             )
 
-        if effective_include:
-            specs = [t for t in specs if t.name in effective_include]
-        if effective_exclude:
-            specs = [t for t in specs if t.name not in effective_exclude]
+        available = {t.name for t in specs}
+
+        # validate names (warn or raise depending on strict/demo)
+        invalid_inc = (inc - available) if inc else set()
+        invalid_exc = (exc - available) if exc else set()
+
+        self._handle_invalid_tool_names(
+            kind="include", invalid=invalid_inc, available=available
+        )
+        self._handle_invalid_tool_names(
+            kind="exclude", invalid=invalid_exc, available=available
+        )
+
+        if inc:
+            inc = inc & available
+            specs = [t for t in specs if t.name in inc]
+
+        if exc:
+            exc = exc & available
+            specs = [t for t in specs if t.name not in exc]
+
+        if (inc or exc) and not specs:
+            msg = (
+                f"Tool filtering produced zero tools for provider={self.provider}. "
+                f"include={sorted(inc)} exclude={sorted(exc)}"
+            )
+            if self._filter_config_strict():
+                raise ValidationError(
+                    message=msg,
+                    domain="trading",
+                    provider=self.provider,
+                    field_errors=[
+                        {
+                            "loc": ["include/exclude"],
+                            "msg": "no tools selected",
+                            "type": "value_error.invalid",
+                        },
+                    ],
+                )
+            warnings.warn(msg, category=UserWarning, stacklevel=3)
+
         return specs
 
     def bundle(

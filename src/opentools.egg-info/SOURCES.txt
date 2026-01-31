@@ -32,6 +32,7 @@ src/opentools/core/bundles.py
 src/opentools/core/errors.py
 src/opentools/core/frameworks.py
 src/opentools/core/logging.py
+src/opentools/core/tool_policy.py
 src/opentools/core/tool_runner.py
 src/opentools/core/tools.py
 src/opentools/core/transport.py
