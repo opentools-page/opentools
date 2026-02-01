@@ -1,7 +1,14 @@
 Metadata-Version: 2.4
-Name: opentools
-Version: 0.1.0
-Summary: an opentool registry
+Name: opentools-sdk
+Version: 0.0.1
+Summary: An open registry of pre-made integrations that can work with any frameworks
+Author: OpenTools
+License-Expression: Apache-2.0
+Project-URL: Homepage, https://www.opentools.page
+Project-URL: Documentation, https://www.opentools.page/docs
+Project-URL: Repository, https://github.com/opentools-page/opentools
+Project-URL: Issues, https://github.com/opentools-page/opentools/issues
+Keywords: tools,tool-calling,agents,llm,sdk,pydantic
 Requires-Python: >=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: anthropic>=0.75.0
@@ -17,7 +24,6 @@ Requires-Dist: pydantic>=2.12.5
 Requires-Dist: pydantic-ai>=1.38.0
 Requires-Dist: pydantic-ai-slim[google]>=1.38.0
 Requires-Dist: pynacl>=1.6.1
-Requires-Dist: pytest>=9.0.2
 Requires-Dist: python-dotenv>=1.2.1
 
 ## Introduction

@@ -1,11 +1,6 @@
 README.md
 pyproject.toml
 src/opentools/__init__.py
-src/opentools.egg-info/PKG-INFO
-src/opentools.egg-info/SOURCES.txt
-src/opentools.egg-info/dependency_links.txt
-src/opentools.egg-info/requires.txt
-src/opentools.egg-info/top_level.txt
 src/opentools/adapters/utils.py
 src/opentools/adapters/frameworks/langgraph/__init__.py
 src/opentools/adapters/frameworks/pydantic_ai/__init__.py
@@ -74,3 +69,8 @@ src/opentools/trading/services/__init__.py
 src/opentools/trading/services/core.py
 src/opentools/trading/services/multi.py
 src/opentools/trading/services/provider.py
+src/opentools_sdk.egg-info/PKG-INFO
+src/opentools_sdk.egg-info/SOURCES.txt
+src/opentools_sdk.egg-info/dependency_links.txt
+src/opentools_sdk.egg-info/requires.txt
+src/opentools_sdk.egg-info/top_level.txt

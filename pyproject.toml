@@ -3,11 +3,21 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "opentools"
-version = "0.1.0"
-description = "an opentool registry"
+name = "opentools-sdk"
+version = "0.0.1"
+description = "An open registry of pre-made integrations that can work with any frameworks"
 readme = "README.md"
 requires-python = ">=3.12"
+
+authors = [
+  { name = "OpenTools" }
+]
+
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+
+keywords = ["tools", "tool-calling", "agents", "llm", "sdk", "pydantic"]
+
 dependencies = [
   "anthropic>=0.75.0",
   "google-genai>=1.56.0",
@@ -22,12 +32,17 @@ dependencies = [
   "pydantic-ai>=1.38.0",
   "pydantic-ai-slim[google]>=1.38.0",
   "pynacl>=1.6.1",
-  "pytest>=9.0.2",
   "python-dotenv>=1.2.1",
 ]
 
+[project.urls]
+Homepage = "https://www.opentools.page"
+Documentation = "https://www.opentools.page/docs"
+Repository = "https://github.com/opentools-page/opentools"
+Issues = "https://github.com/opentools-page/opentools/issues"
+
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -35,10 +50,11 @@ include = ["opentools*"]
 
 [dependency-groups]
 dev = [
-    "opentools",
-    "pytest>=9.0.2",
-    "pytest-asyncio>=1.3.0",
-    "respx>=0.22.0",
+  "pytest>=9.0.2",
+  "pytest-asyncio>=1.3.0",
+  "respx>=0.22.0",
+  "twine>=6.2.0",
+  "build>=1.2.1",
 ]
 
 [tool.pytest.ini_options]
@@ -46,6 +62,3 @@ markers = [
   "integration: tests that call real provider APIs"
 ]
 asyncio_mode = "auto"
-
-[tool.uv.sources]
-opentools = { workspace = true }

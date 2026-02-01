@@ -1,30 +1,121 @@
-## Introduction
+Quickstart
 
-TLDR;
+OpenTools gives you ready-made toolsets (like Trading) that return consistent outputs.
 
-Creating an open registry of tools that can be used by LLMS to ensure accurate, up-to-date context
+In this quickstart, you’ll create a working agent that connects to your Alpaca account and returns your account information.
 
-The registry, known as opentools, is designed with a modular architecture - each module is designed
-to be able to work independetly of one another. 
+⸻
 
-The only configuration required from the developer is the use of their own key for the tools that are provided ready-made. For more information on this, please look further into the configuration overview below. Please note that each module has its own readme and details for each of the methods utilised so it is easy to set up.
+Get started
 
-An example output that you would need to add would resemble this in appearance:
+1) Install the SDK
 
-```python 
-    tools = trading.alpaca(
-        key_id=ALPACA_KEY,
-        secret_key=ALPACA_SECRET",
+Open your terminal. Create a folder called my_agent, set up a virtual environment, and install the minimal dependencies.
+
+uv (recommended)
+
+mkdir my_agent
+cd my_agent
+uv venv
+uv pip install opentools-sdk openai python-dotenv
+
+pip
+
+mkdir my_agent
+cd my_agent
+python -m venv .venv
+source .venv/bin/activate
+pip install opentools-sdk openai python-dotenv
+
+
+⸻
+
+2) Add your API keys to your .env file
+
+OpenTools reads credentials from environment variables. For this quickstart we’ll use Alpaca.
+
+Model API key (OpenAI)
+If you already have an OpenAI API key, add it to your .env file.
+	•	Navigate to the OpenAI dashboard (API keys section)
+	•	Click Create new secret key
+	•	Copy the key and store it somewhere safe
+
+If you already export OPENAI_API_KEY globally, you can omit it from .env.
+
+Alpaca API key
+	•	Create an Alpaca account (no funding required for paper trading)
+	•	In the dashboard homepage, find Your API Keys
+	•	Click Generate New Keys
+	•	Copy your Key ID and Secret Key
+
+Alpaca only shows the Secret Key once. If you lose it, you must generate a new key pair.
+
+Create a .env file
+This quickstart uses paper trading by default. OpenTools does not store credentials.
+
+Create a file named .env in the same folder as main.py:
+
+OPENAI_API_KEY="your_openai_api_key"
+ALPACA_KEY="your_alpaca_key_id"
+ALPACA_SECRET="your_alpaca_secret_key"
+
+
+⸻
+
+3) Run your first tool call
+
+You’re about to run a small tool loop:
+	•	the LLM decides which trading tool to call
+	•	OpenTools executes it
+	•	the LLM summarises the result
+
+This example uses paper trading and minimal output.
+
+Create a main.py
+
+import asyncio
+import os
+
+from dotenv import load_dotenv
+from openai import AsyncOpenAI
+
+from opentools import trading
+from opentools.adapters.models.openai import run_with_tools
+
+
+async def main() -> None:
+    load_dotenv()
+
+    client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+    service = trading.alpaca(
+        api_key=os.environ["ALPACA_KEY"],
+        api_secret=os.environ["ALPACA_SECRET"],
         model="openai",
-        framework="langgraph",
+        paper=True,
+        minimal=True,
     )
-```
+
+    prompt = "Show my account summary and list any open positions."
+
+    result = await run_with_tools(
+        client=client,
+        model="gpt-4.1-mini",
+        service=service,
+        user_prompt=prompt,
+    )
+
+    print(result)
 
 
-As shown, this object is compatible with langgraph tools (pydantic_ai is also natively supported). Furthermore, openai is the model provider in this example although gemini, anthropic, ollama and openrouter are also natively supported. The only configuration beyond this is that you supply the auth needed for that service, for ollama just get your free key_id and respective secret_key. Instructions are also provided to help with setup with any of the integrated services. There is a growing roadmap already detailed with additional services (inluding ones already configured), if any might be of interest - go ahead and add a suggestion of your own!
+if __name__ == "__main__":
+    asyncio.run(main())
 
+Run your code
 
-> [!NOTE]  
-> This is the Python SDK. A TypeScript-compatible SDK is planned, and will aim to mirror this one as closely as possible.
+python main.py
 
-## Configuration
+If the model doesn’t call tools, structure prompts explicitly around them, e.g.:
+	•	"Get my account"
+	•	"List positions"
+	•	"Show recent orders"

@@ -448,14 +448,14 @@ class TradingService(Sequence[Any]):
                 out.append(p)
         return out
 
-    def _normalize_tool_filter(self, x: Iterable[str] | None) -> set[str]:
+    def _normalise_tool_filter(self, x: Iterable[str] | None) -> set[str]:
         if x is None:
             return set()
         if isinstance(x, str):
             return {x}
         return {str(i) for i in x}
 
-    def _canonicalize_tool_name(self, name: str) -> str:
+    def _canonicalise_tool_name(self, name: str) -> str:
         provider_prefix = f"{self.provider}_"
         if name.startswith(provider_prefix):
             return name
@@ -504,13 +504,12 @@ class TradingService(Sequence[Any]):
         include: Iterable[str] | None = None,
         exclude: Iterable[str] | None = None,
     ) -> list[ToolSpec]:
-        # normalize (and protect against include="get_account" -> chars)
-        inc = self._normalize_tool_filter(include) or set(self.include)
-        exc = self._normalize_tool_filter(exclude) or set(self.exclude)
+        inc = self._normalise_tool_filter(include) or set(self.include)
+        exc = self._normalise_tool_filter(exclude) or set(self.exclude)
 
         # optional ergonomics: allow bare tool names
-        inc = {self._canonicalize_tool_name(x) for x in inc}
-        exc = {self._canonicalize_tool_name(x) for x in exc}
+        inc = {self._canonicalise_tool_name(x) for x in inc}
+        exc = {self._canonicalise_tool_name(x) for x in exc}
 
         ts_self = cast("TradingService", self)
 
